@@ -1,0 +1,223 @@
+'use strict';
+
+/** @type {import('sequelize-cli').Migration} */
+module.exports = {
+  async up(queryInterface, Sequelize) {
+    await queryInterface.bulkInsert('categories', [
+      {
+        id: 1,
+        name: 'Văn học',
+        slug: 'van-hoc',
+        description: 'Tiểu thuyết, truyện ngắn, thơ ca, văn học Việt Nam và thế giới',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400',
+        icon: 'book',
+        is_active: true,
+        sort_order: 1,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 2,
+        name: 'Tiểu thuyết',
+        slug: 'tieu-thuyet',
+        description: 'Các tác phẩm tiểu thuyết hay nhất',
+        parent_id: 1,
+        image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400',
+        icon: 'book-open',
+        is_active: true,
+        sort_order: 1,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 3,
+        name: 'Thơ ca',
+        slug: 'tho-ca',
+        description: 'Tập thơ, tuyển tập thơ ca',
+        parent_id: 1,
+        image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400',
+        icon: 'heart',
+        is_active: true,
+        sort_order: 2,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 4,
+        name: 'Kinh tế - Kinh doanh',
+        slug: 'kinh-te-kinh-doanh',
+        description: 'Sách về kinh doanh, đầu tư, tài chính, marketing',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        icon: 'trending-up',
+        is_active: true,
+        sort_order: 2,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 5,
+        name: 'Khởi nghiệp',
+        slug: 'khoi-nghiep',
+        description: 'Hướng dẫn khởi nghiệp, xây dựng doanh nghiệp',
+        parent_id: 4,
+        image: 'https://images.unsplash.com/photo-1556761175-b413da4baf72?w=400',
+        icon: 'rocket',
+        is_active: true,
+        sort_order: 1,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 6,
+        name: 'Đầu tư tài chính',
+        slug: 'dau-tu-tai-chinh',
+        description: 'Sách về đầu tư, tài chính cá nhân',
+        parent_id: 4,
+        image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400',
+        icon: 'dollar-sign',
+        is_active: true,
+        sort_order: 2,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 7,
+        name: 'Công nghệ',
+        slug: 'cong-nghe',
+        description: 'Lập trình, AI, khoa học máy tính, công nghệ thông tin',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1518709268805-4e9042af2176?w=400',
+        icon: 'cpu',
+        is_active: true,
+        sort_order: 3,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 8,
+        name: 'Lập trình',
+        slug: 'lap-trinh',
+        description: 'Các ngôn ngữ lập trình, framework, thư viện',
+        parent_id: 7,
+        image: 'https://images.unsplash.com/photo-1461749280684-dccba630e2f6?w=400',
+        icon: 'code',
+        is_active: true,
+        sort_order: 1,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 9,
+        name: 'Trí tuệ nhân tạo',
+        slug: 'ai-machine-learning',
+        description: 'AI, Machine Learning, Deep Learning',
+        parent_id: 7,
+        image: 'https://images.unsplash.com/photo-1507146426996-ef05306b995a?w=400',
+        icon: 'brain',
+        is_active: true,
+        sort_order: 2,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 10,
+        name: 'Tâm lý - Kỹ năng sống',
+        slug: 'tam-ly-ky-nang-song',
+        description: 'Phát triển bản thân, tâm lý học, kỹ năng mềm',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1559757148-5c350d0d3c56?w=400',
+        icon: 'heart-pulse',
+        is_active: true,
+        sort_order: 4,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 11,
+        name: 'Phát triển bản thân',
+        slug: 'phat-trien-ban-than',
+        description: 'Sách self-help, phát triển cá nhân',
+        parent_id: 10,
+        image: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400',
+        icon: 'user-plus',
+        is_active: true,
+        sort_order: 1,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 12,
+        name: 'Lịch sử',
+        slug: 'lich-su',
+        description: 'Sách lịch sử Việt Nam và thế giới',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1481627834876-b7833e8f5570?w=400',
+        icon: 'clock',
+        is_active: true,
+        sort_order: 5,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 13,
+        name: 'Khoa học',
+        slug: 'khoa-hoc',
+        description: 'Khoa học tự nhiên, vật lý, hóa học, sinh học',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=400',
+        icon: 'flask',
+        is_active: true,
+        sort_order: 6,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 14,
+        name: 'Thiếu nhi',
+        slug: 'thieu-nhi',
+        description: 'Sách dành cho trẻ em, thiếu nhi',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+        icon: 'gift',
+        is_active: true,
+        sort_order: 7,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      },
+      {
+        id: 15,
+        name: 'Y tế - Sức khỏe',
+        slug: 'y-te-suc-khoe',
+        description: 'Sách về y học, sức khỏe, dinh dưỡng',
+        parent_id: null,
+        image: 'https://images.unsplash.com/photo-1559757175-0eb30cd9e2d2?w=400',
+        icon: 'medical',
+        is_active: true,
+        sort_order: 8,
+        books_count: 0,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    ]);
+  },
+
+  async down(queryInterface, Sequelize) {
+    await queryInterface.bulkDelete('categories', null, {});
+  }
+};

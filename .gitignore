@@ -1,0 +1,71 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env & secrets
+.env
+.env.*
+*.keystore
+**/debug.keystore
+
+# Logs
+logs/
+*.log
+
+# Expo / React Native
+.expo/
+.expo-shared/
+.expo-web/
+.expo-dev-cache/
+.packager/
+.expo-cli/
+.expo/*
+web-build/
+
+# Metro
+.cache/
+
+# Android
+**/android/.gradle/
+**/android/.idea/
+**/android/local.properties
+**/android/.settings/
+**/android/build/
+**/android/app/build/
+**/android/captures/
+**/android/gradle/
+**/android/gradlew*
+**/android/gradle-wrapper.jar
+**/android/gradle-wrapper.properties
+
+# iOS
+**/ios/build/
+**/ios/Pods/
+**/ios/DerivedData/
+**/ios/*.xcodeproj/project.xcworkspace/
+**/ios/*.xcworkspace/xcuserdata/
+**/ios/*.xcodeproj/xcuserdata/
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# SQLite & uploads
+**/backend-api/database.sqlite
+**/backend-api/uploads/
+**/backend-api/uploads/**
+**/backend-api/public/docs/
+
+# Misc
+.tmp/
+.temp/
+.idea/
+.vscode/
