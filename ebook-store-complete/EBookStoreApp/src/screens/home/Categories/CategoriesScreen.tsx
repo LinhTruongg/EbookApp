@@ -11,6 +11,7 @@ import {
   Alert,
   RefreshControl,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
 import { apiService } from '../../../services/api';
 import { Category } from '../../../types';
@@ -21,11 +22,8 @@ interface CategoryWithUI extends Category {
   icon: string;
 }
 
-interface CategoriesScreenProps {
-  navigation: any;
-}
-
-const CategoriesScreen: React.FC<CategoriesScreenProps> = ({ navigation }) => {
+const CategoriesScreen: React.FC = () => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [categories, setCategories] = useState<CategoryWithUI[]>([]);
@@ -103,15 +101,7 @@ const CategoriesScreen: React.FC<CategoriesScreenProps> = ({ navigation }) => {
   const renderCategoryItem = ({ item }: { item: CategoryWithUI }) => (
     <TouchableOpacity
       style={[styles.categoryCard, { backgroundColor: item.backgroundColor }]}
-      onPress={() => navigation.navigate('CategoryDetail', { 
-        category: {
-          id: item.id,
-          name: item.name,
-          description: item.description || `Khám phá các cuốn sách hay nhất trong thể loại ${item.name}`,
-          icon: item.icon,
-          slug: item.slug
-        }
-      })}
+      onPress={() => router.push(`/category-detail/${item.id}?name=${encodeURIComponent(item.name)}&description=${encodeURIComponent(item.description || `Khám phá các cuốn sách hay nhất trong thể loại ${item.name}`)}&icon=${encodeURIComponent(item.icon)}&slug=${encodeURIComponent(item.slug)}`)}
     >
       <Text style={styles.categoryIcon}>{item.icon}</Text>
       <Text style={styles.categoryName}>{item.name}</Text>

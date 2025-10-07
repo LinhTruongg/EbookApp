@@ -10,15 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
 
-interface ChangePasswordScreenProps {
-  navigation: any;
-}
-
-export default function ChangePasswordScreen({ navigation }: ChangePasswordScreenProps) {
+export default function ChangePasswordScreen() {
   const { changePassword } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     currentPassword: '',
@@ -93,7 +91,7 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
                 newPassword: '',
                 confirmPassword: '',
               });
-              navigation.goBack();
+              router.back();
             },
           },
         ]
@@ -248,7 +246,7 @@ export default function ChangePasswordScreen({ navigation }: ChangePasswordScree
 
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           >
             <Text style={styles.cancelButtonText}>Hủy</Text>
           </TouchableOpacity>

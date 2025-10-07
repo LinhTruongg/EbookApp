@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants/index';
 import PDFReader from '../../../components/book/PDFReader';
 import { apiService } from '../../../services/api';
@@ -12,11 +13,11 @@ interface BookReaderScreenProps {
       book: Book;
     };
   };
-  navigation: any;
 }
 
-export default function BookReaderScreen({ route, navigation }: BookReaderScreenProps) {
+export default function BookReaderScreen({ route }: BookReaderScreenProps) {
   const { book: initialBook } = route.params;
+  const router = useRouter();
   const [book, setBook] = useState<Book>(initialBook);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(initialBook.pageCount || 10);
@@ -176,7 +177,7 @@ export default function BookReaderScreen({ route, navigation }: BookReaderScreen
       
       {/* Control Bar */}
       <View style={styles.controlBar}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.controlButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.controlButton}>
           <Text style={styles.controlButtonText}>✕</Text>
         </TouchableOpacity>
         <View style={styles.controlButtons}>

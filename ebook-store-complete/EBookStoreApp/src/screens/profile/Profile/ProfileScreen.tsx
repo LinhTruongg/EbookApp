@@ -10,15 +10,13 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
 
-interface ProfileScreenProps {
-  navigation: any;
-}
-
-function ProfileScreen({ navigation }: ProfileScreenProps) {
+function ProfileScreen() {
   const { user, logout, isLoading } = useAuth();
+  const router = useRouter();
   const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -46,11 +44,8 @@ function ProfileScreen({ navigation }: ProfileScreenProps) {
               await logout();
               
               console.log('✅ Logout completed successfully');
-              // Ensure navigation returns to Auth stack immediately
-              navigation.reset({
-                index: 0,
-                routes: [{ name: 'Auth' }],
-              });
+              // Navigate to login screen using Expo Router
+              router.replace('/auth/login');
             } catch (error) {
               console.error('❌ Logout error:', error);
               Alert.alert(
@@ -257,7 +252,7 @@ function ProfileScreen({ navigation }: ProfileScreenProps) {
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => navigation.navigate('EditProfile')}
+            onPress={() => router.push('/profile/edit')}
           >
             <Text style={styles.quickActionEmoji}>✏️</Text>
             <Text style={styles.quickActionTitle}>Chỉnh sửa</Text>
@@ -266,7 +261,7 @@ function ProfileScreen({ navigation }: ProfileScreenProps) {
 
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => navigation.navigate('ChangePassword')}
+            onPress={() => router.push('/profile/change-password')}
           >
             <Text style={styles.quickActionEmoji}>🔒</Text>
             <Text style={styles.quickActionTitle}>Bảo mật</Text>
@@ -338,14 +333,14 @@ function ProfileScreen({ navigation }: ProfileScreenProps) {
       <View style={styles.actionsSection}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigation.navigate('EditProfile')}
+          onPress={() => router.push('/profile/edit')}
         >
           <Text style={styles.actionButtonText}>✏️ Cập nhật thông tin</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => navigation.navigate('ChangePassword')}
+          onPress={() => router.push('/profile/change-password')}
         >
           <Text style={styles.actionButtonText}>🔒 Đổi mật khẩu</Text>
         </TouchableOpacity>

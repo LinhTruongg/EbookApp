@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import ForgotPasswordForm from '../../../components/auth/ForgotPasswordForm';
 
 interface ForgotPasswordScreenProps {
@@ -19,14 +20,16 @@ interface ForgotPasswordScreenProps {
 const { width, height } = Dimensions.get('window');
 
 const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation }) => {
+  const router = useRouter();
+  
   const handleGoBack = () => {
-    navigation.goBack();
+    router.back();
   };
 
   const handleSuccessRedirect = () => {
     // After successful email send, could redirect to login or stay
     setTimeout(() => {
-      navigation.navigate('Login');
+      router.push('/auth/login');
     }, 3000); // Redirect after 3 seconds
   };
 

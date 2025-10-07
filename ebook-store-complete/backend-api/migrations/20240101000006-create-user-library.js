@@ -2,7 +2,7 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('user_library', {
+    await queryInterface.createTable('user_libraries', {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -89,27 +89,27 @@ module.exports = {
       }
     });
 
-    await queryInterface.addConstraint('user_library', {
+    await queryInterface.addConstraint('user_libraries', {
       fields: ['user_id', 'book_id'],
       type: 'unique',
       name: 'unique_user_book'
     });
 
-    await queryInterface.addIndex('user_library', ['user_id'], {
+    await queryInterface.addIndex('user_libraries', ['user_id'], {
       name: 'idx_user_library'
     });
-    await queryInterface.addIndex('user_library', ['book_id'], {
+    await queryInterface.addIndex('user_libraries', ['book_id'], {
       name: 'idx_book_library'
     });
-    await queryInterface.addIndex('user_library', ['is_favorite'], {
+    await queryInterface.addIndex('user_libraries', ['is_favorite'], {
       name: 'idx_favorite'
     });
-    await queryInterface.addIndex('user_library', ['reading_progress'], {
+    await queryInterface.addIndex('user_libraries', ['reading_progress'], {
       name: 'idx_progress'
     });
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.dropTable('user_library');
+    await queryInterface.dropTable('user_libraries');
   }
 };

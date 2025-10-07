@@ -16,6 +16,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
 import { apiService } from '../../../services/api';
 import { Book } from '../../../types';
+import { useRouter } from 'expo-router';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -23,8 +24,9 @@ interface HomeScreenProps {
   navigation: any;
 }
 
-const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
+const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
   const { user } = useAuth();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState('explore');
   const [allBooks, setAllBooks] = useState<Book[]>([]);
   const [featuredBooks, setFeaturedBooks] = useState<Book[]>([]);
@@ -137,7 +139,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     return (
       <TouchableOpacity 
         style={styles.bookItem}
-        onPress={() => navigation.navigate('BookDetail', { book: item })}
+        onPress={() => router.push({
+          pathname: '/book-detail/[id]',
+          params: { id: item.id },
+        })}
       >
         <Image 
           source={{ uri: item.coverImage || 'https://via.placeholder.com/150x200/CCCCCC/FFFFFF?text=No+Image' }} 
@@ -160,7 +165,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
 
-  const renderBookSection = (title: string, books: any[], showAll: boolean = true) => (
+  const renderBookSection = (title: string, books: Book[], showAll: boolean = true) => (
     <View style={styles.section}>
       <View style={styles.sectionHeader}>
         <Text style={styles.sectionTitle}>{title}</Text>
@@ -168,7 +173,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           <TouchableOpacity
             onPress={() => {
               const category = getCategoryMetaBySectionTitle(title);
-              navigation.navigate('CategoryDetail', { category });
+              router.push({
+                pathname: '/category-detail/[id]',
+                params: { id: category.id },
+              });
             }}
           >
             <Text style={styles.seeAllText}>Tất cả ></Text>

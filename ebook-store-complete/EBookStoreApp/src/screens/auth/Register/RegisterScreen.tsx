@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import RegisterForm from '../../../components/auth/RegisterForm';
 import { COLORS, SIZES } from '../../../constants';
 
@@ -20,8 +21,10 @@ interface RegisterScreenProps {
 const { width, height } = Dimensions.get('window');
 
 const RegisterScreen: React.FC<RegisterScreenProps> = ({ navigation }) => {
+  const router = useRouter();
+  
   const handleNavigateToLogin = () => {
-    navigation.goBack();
+    router.back();
   };
 
   return (

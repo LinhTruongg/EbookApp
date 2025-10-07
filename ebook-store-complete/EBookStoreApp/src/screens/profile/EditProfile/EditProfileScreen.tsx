@@ -10,16 +10,14 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
 import { User } from '../../../types';
 
-interface EditProfileScreenProps {
-  navigation: any;
-}
-
-export default function EditProfileScreen({ navigation }: EditProfileScreenProps) {
+export default function EditProfileScreen() {
   const { user, updateProfile } = useAuth();
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: '',
@@ -88,7 +86,7 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
         [
           {
             text: 'OK',
-            onPress: () => navigation.goBack(),
+            onPress: () => router.back(),
           },
         ]
       );
@@ -237,7 +235,7 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
 
           <TouchableOpacity
             style={[styles.button, styles.cancelButton]}
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           >
             <Text style={styles.cancelButtonText}>Hủy</Text>
           </TouchableOpacity>

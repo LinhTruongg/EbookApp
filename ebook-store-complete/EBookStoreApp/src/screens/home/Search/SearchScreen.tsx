@@ -11,6 +11,7 @@ import {
   StatusBar,
   Keyboard,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants/index';
 import { apiService } from '../../../services/api';
 
@@ -19,6 +20,7 @@ interface SearchScreenProps {
 }
 
 const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
@@ -239,7 +241,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
   };
 
   const handleBackPress = () => {
-    navigation.goBack();
+    router.back();
   };
 
   // Generate suggestions based on search history and popular terms
