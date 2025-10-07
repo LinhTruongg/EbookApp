@@ -38,6 +38,55 @@ router.get('/library', authenticateToken, userController.getUserLibrary);
 
 /**
  * @swagger
+ * /api/users/library/categorized:
+ *   get:
+ *     tags: [Users]
+ *     summary: Get user's library books categorized by reading status (reading, favorited, completed)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Successfully retrieved categorized library
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     categories:
+ *                       type: object
+ *                       properties:
+ *                         reading:
+ *                           type: array
+ *                           description: Books currently being read (1-99% progress)
+ *                         favorited:
+ *                           type: array
+ *                           description: Books marked as favorites
+ *                         completed:
+ *                           type: array
+ *                           description: Books with 100% reading progress
+ *                     stats:
+ *                       type: object
+ *                       properties:
+ *                         totalBooks:
+ *                           type: integer
+ *                         reading:
+ *                           type: integer
+ *                         favorited:
+ *                           type: integer
+ *                         completed:
+ *                           type: integer
+ *                         unread:
+ *                           type: integer
+ */
+router.get('/library/categorized', authenticateToken, userController.getUserLibraryCategorized);
+
+/**
+ * @swagger
  * /api/users/wishlist:
  *   get:
  *     tags: [Users]

@@ -116,6 +116,20 @@ export interface Book {
   updatedAt: string;
 }
 
+export interface UserLibaryEntity {
+  id: string;
+  userId: string;
+  bookId: string;
+  book: Book;
+  readProgress: number;
+  currentPage: number;
+  isFavorite: boolean;
+  purchaseDate?: string;
+  readingTimeInMinutes?: number;
+  accessType: string;
+  notes?: string;
+}
+
 export interface Category {
   id: string;
   name: string;

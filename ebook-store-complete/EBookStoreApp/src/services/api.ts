@@ -19,6 +19,7 @@ import {
   CommentStats,
   CommentsResponse,
   CreateCommentRequest,
+  UserLibaryEntity,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -246,6 +247,24 @@ class ApiService {
       newPassword,
     });
     console.log('✅ Password changed successfully');
+    return response.data;
+  }
+
+  async getUserLibraryCategorized(): Promise<ApiResponse<{
+    categories: {
+      reading: UserLibaryEntity[];
+      favorited: UserLibaryEntity[];
+      completed: UserLibaryEntity[];
+    };
+    statistics: {
+      totalBooks: number;
+      reading: number;
+      favorited: number;
+      completed: number;
+      unread: number;
+    };
+  }>> {
+    const response = await this.axiosInstance.get('/users/library/categorized');
     return response.data;
   }
 

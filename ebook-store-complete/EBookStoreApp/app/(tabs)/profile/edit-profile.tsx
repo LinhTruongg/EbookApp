@@ -5,11 +5,5 @@ import EditProfileScreen from '../../../src/screens/profile/EditProfile/EditProf
 export default function EditProfile() {
   const router = useRouter();
   
-  const navigation = {
-    goBack: () => {
-      router.back();
-    }
-  };
-
-  return <EditProfileScreen navigation={navigation} />;
+  return <EditProfileScreen />;
 }

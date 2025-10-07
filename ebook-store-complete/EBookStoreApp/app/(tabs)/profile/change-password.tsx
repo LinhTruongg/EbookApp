@@ -5,11 +5,5 @@ import ChangePasswordScreen from '../../../src/screens/profile/ChangePassword/Ch
 export default function ChangePassword() {
   const router = useRouter();
   
-  const navigation = {
-    goBack: () => {
-      router.back();
-    }
-  };
-
-  return <ChangePasswordScreen navigation={navigation} />;
+  return <ChangePasswordScreen  />;
 }

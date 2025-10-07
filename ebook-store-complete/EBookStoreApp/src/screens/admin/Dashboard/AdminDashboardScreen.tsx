@@ -1350,15 +1350,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 2,
-  },
   userEmail: {
     fontSize: 12,
     color: '#64748B',

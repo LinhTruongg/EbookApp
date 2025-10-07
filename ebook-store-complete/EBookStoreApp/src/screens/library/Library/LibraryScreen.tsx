@@ -9,87 +9,88 @@ import {
   Image,
   TextInput,
   Modal,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
+import { apiService } from '../../../services/api';
+import { Book } from '../../../types';
 
-interface LibraryScreenProps {
-  navigation: any;
-}
-
-interface Book {
-  id: string;
-  title: string;
-  author: string;
-  coverImage: string;
-  category: string;
-  progress?: number; // 0-100
-}
-
-const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
-  const [activeTab, setActiveTab] = useState<'reading' | 'want-to-read' | 'read'>('reading');
+const LibraryScreen: React.FC = () => {
+  const router = useRouter();
+  const [activeTab, setActiveTab] = useState<'reading' | 'favorited' | 'completed'>('reading');
   const [books, setBooks] = useState<{
     reading: Book[];
-    wantToRead: Book[];
-    read: Book[];
+    favorited: Book[];
+    completed: Book[];
   }>({
     reading: [],
-    wantToRead: [],
-    read: []
+    favorited: [],
+    completed: []
   });
+  const [statistics, setStatistics] = useState({
+    totalBooks: 0,
+    reading: 0,
+    favorited: 0,
+    completed: 0,
+    unread: 0,
+  });
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
   const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
 
   const tabs = [
     { key: 'reading', label: 'Đang đọc' },
-    { key: 'want-to-read', label: 'Muốn đọc' },
-    { key: 'read', label: 'Đã đọc' },
+    { key: 'favorited', label: 'Yêu thích' },
+    { key: 'completed', label: 'Đã đọc' },
   ];
 
-  // Sample data - in real app, this would come from API
+  // Load library data from API
   useEffect(() => {
-    setBooks({
-      reading: [
-        {
-          id: '1',
-          title: 'ĐẮC NHÂN TÂM',
-          author: 'Dale Carnegie',
-          coverImage: 'https://via.placeholder.com/150x200/F44336/FFFFFF?text=ĐẮC+NHÂN+TÂM',
-          category: 'Soft Skills',
-          progress: 45
-        }
-      ],
-      wantToRead: [
-        {
-          id: '2',
-          title: 'TƯ DUY NHANH VÀ CHẬM',
-          author: 'Daniel Kahneman',
-          coverImage: 'https://via.placeholder.com/150x200/FFFFFF/000000?text=TƯ+DUY+NHANH',
-          category: 'Psychology'
-        }
-      ],
-      read: [
-        {
-          id: '3',
-          title: 'TÔI TÀI GIỎI BẠN CŨNG THẾ!',
-          author: 'Adam Khoo',
-          coverImage: 'https://via.placeholder.com/150x200/4CAF50/FFFFFF?text=TÔI+TÀI+GIỎI',
-          category: 'Self Help',
-          progress: 100
-        }
-      ]
-    });
+    loadLibraryData();
   }, []);
+
+  const loadLibraryData = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getUserLibraryCategorized();
+      console.log('Library response:', response);
+      
+      if (response.success && response.data) {
+        setBooks({
+          reading: response.data.categories.reading.map(item => item.book) || [],
+          favorited: response.data.categories.favorited.map(item => item.book) || [],
+          completed: response.data.categories.completed.map(item => item.book) || [],
+        });
+        setStatistics(response.data.statistics || {
+          totalBooks: 0,
+          reading: 0,
+          favorited: 0,
+          completed: 0,
+          unread: 0,
+        });
+      } else {
+        Alert.alert('Lỗi', response.message || 'Không thể tải thư viện');
+      }
+    } catch (error) {
+      console.error('Error loading library:', error);
+      Alert.alert('Lỗi', 'Không thể tải thư viện. Vui lòng thử lại.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getCurrentBooks = () => {
     const currentBooks = (() => {
       switch (activeTab) {
         case 'reading':
           return books.reading;
-        case 'want-to-read':
-          return books.wantToRead;
-        case 'read':
-          return books.read;
+        case 'favorited':
+          return books.favorited;
+        case 'completed':
+          return books.completed;
         default:
           return [];
       }
@@ -99,8 +100,12 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
     if (searchQuery.trim()) {
       return currentBooks.filter(book => 
         book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        book.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (book.authors && book.authors.some(author => 
+          author.name.toLowerCase().includes(searchQuery.toLowerCase())
+        )) ||
+        (book.categories && book.categories.some(category => 
+          category.name.toLowerCase().includes(searchQuery.toLowerCase())
+        ))
       );
     }
 
@@ -108,7 +113,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
   };
 
   const getAllBooks = () => {
-    return [...books.reading, ...books.wantToRead, ...books.read];
+    return [...books.reading, ...books.favorited, ...books.completed];
   };
 
   const handleSearch = (query: string) => {
@@ -117,8 +122,12 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
       const allBooks = getAllBooks();
       const filtered = allBooks.filter(book => 
         book.title.toLowerCase().includes(query.toLowerCase()) ||
-        book.author.toLowerCase().includes(query.toLowerCase()) ||
-        book.category.toLowerCase().includes(query.toLowerCase())
+        (book.authors && book.authors.some(author => 
+          author.name.toLowerCase().includes(query.toLowerCase())
+        )) ||
+        (book.categories && book.categories.some(category => 
+          category.name.toLowerCase().includes(query.toLowerCase())
+        ))
       );
       setFilteredBooks(filtered);
     } else {
@@ -137,14 +146,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
   };
 
   const handleBookPress = (book: Book) => {
-    navigation.navigate('BookReader', {
-      book: {
-        id: book.id,
-        title: book.title,
-        author: book.author,
-        coverImage: book.coverImage,
-      }
-    });
+    router.push(`/book-reader/${book.id}` as any);
   };
 
   const renderBookItem = ({ item }: { item: Book }) => (
@@ -152,21 +154,48 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
       style={styles.bookItem}
       onPress={() => handleBookPress(item)}
     >
-      <Image source={{ uri: item.coverImage }} style={styles.bookCover} />
+      <Image source={{ uri: item.coverImage || 'https://via.placeholder.com/150x200' }} style={styles.bookCover} />
       <View style={styles.bookInfo}>
         <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>{item.author}</Text>
-        {item.progress !== undefined && (
+        <Text style={styles.bookAuthor} numberOfLines={1}>
+          {item.authors && item.authors?.length > 0 ? item.authors[0].name : 'Unknown Author'}
+        </Text>
+        {/* Show reading progress for books in reading tab */}
+        {activeTab === 'reading' && (
           <View style={styles.progressContainer}>
             <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${item.progress}%` }]} />
+              <View style={[styles.progressFill, { width: '0%' }]} />
             </View>
-            <Text style={styles.progressText}>{item.progress}%</Text>
+            <Text style={styles.progressText}>0%</Text>
           </View>
         )}
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Text style={styles.headerIconText}>✏️</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Thư viện</Text>
+          <TouchableOpacity style={styles.headerIcon}>
+            <Text style={styles.headerIconText}>🔍</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Đang tải thư viện...</Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -184,7 +213,7 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
       </View>
 
       {/* Search Bar */}
-      {searchQuery.trim() && (
+      {searchQuery?.trim() && (
         <View style={styles.searchBar}>
           <TextInput
             style={styles.searchInput}
@@ -224,7 +253,17 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
 
       {/* Books List */}
       <View style={styles.booksContainer}>
-        {getCurrentBooks().length > 0 ? (
+        {getCurrentBooks()?.length === 0 && (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {activeTab === 'reading' ? 'Chưa có sách nào đang đọc' :
+               activeTab === 'favorited' ? 'Chưa có sách nào yêu thích' :
+               activeTab === 'completed' ? 'Chưa có sách nào đã đọc' :
+               'Chưa có sách nào'}
+            </Text>
+          </View>
+        )}
+        {getCurrentBooks()?.length > 0 ? (
           <FlatList
             data={getCurrentBooks()}
             renderItem={renderBookItem}
@@ -236,9 +275,10 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ navigation }) => {
         ) : (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {activeTab === 'reading' && 'Chưa có sách nào đang đọc'}
-              {activeTab === 'want-to-read' && 'Chưa có sách nào muốn đọc'}
-              {activeTab === 'read' && 'Chưa có sách nào đã đọc'}
+              {activeTab === 'reading' ? 'Chưa có sách nào đang đọc' :
+               activeTab === 'favorited' ? 'Chưa có sách nào yêu thích' :
+               activeTab === 'completed' ? 'Chưa có sách nào đã đọc' :
+               'Chưa có sách nào'}
             </Text>
           </View>
         )}
@@ -292,6 +332,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: SIZES.font.md,
+    color: COLORS.textSecondary,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -325,7 +376,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 15,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.lightGray,
+    borderBottomColor: COLORS.border,
   },
   tab: {
     flex: 1,

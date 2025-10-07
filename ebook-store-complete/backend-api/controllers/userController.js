@@ -181,6 +181,100 @@ class UserController {
     }
   }
 
+  // Get user's library books categorized by reading status
+  async getUserLibraryCategorized(req, res) {
+    try {
+      const userId = req.user.id;
+
+      // Get all user library books with book details
+      const allLibraryBooks = await UserLibrary.findAll({
+        where: { userId },
+        include: [{
+          model: Book,
+          as: 'book',
+          where: { status: 'active' },
+          include: [
+            {
+              model: Category,
+              as: 'category',
+              attributes: ['id', 'name', 'slug']
+            },
+            {
+              model: Author,
+              as: 'authors',
+              attributes: ['id', 'name']
+            }
+          ]
+        }],
+        order: [['lastReadAt', 'DESC'], ['purchaseDate', 'DESC']]
+      });
+
+      // Categorize books by reading status
+      const categorizedBooks = {
+        reading: [],
+        favorited: [],
+        completed: []
+      };
+
+      allLibraryBooks.forEach(libraryBook => {
+        const bookData = {
+          id: libraryBook.id,
+          bookId: libraryBook.bookId,
+          book: libraryBook.book,
+          readingProgress: libraryBook.readingProgress,
+          currentPage: libraryBook.currentPage,
+          lastReadAt: libraryBook.lastReadAt,
+          isFavorite: libraryBook.isFavorite,
+          readingTimeMinutes: libraryBook.readingTimeMinutes,
+          purchaseDate: libraryBook.purchaseDate,
+          accessType: libraryBook.accessType,
+          notes: libraryBook.notes
+        };
+
+        // Add to reading category if progress is between 1-99%
+        if (libraryBook.readingProgress > 0 && libraryBook.readingProgress < 100) {
+          categorizedBooks.reading.push(bookData);
+        }
+
+        // Add to favorited category if marked as favorite
+        if (libraryBook.isFavorite) {
+          categorizedBooks.favorited.push(bookData);
+        }
+
+        // Add to completed category if progress is 100%
+        if (libraryBook.readingProgress === 100) {
+          categorizedBooks.completed.push(bookData);
+        }
+      });
+
+      // Get counts for each category
+      const stats = {
+        totalBooks: allLibraryBooks.length,
+        reading: categorizedBooks.reading.length,
+        favorited: categorizedBooks.favorited.length,
+        completed: categorizedBooks.completed.length,
+        unread: allLibraryBooks.filter(book => book.readingProgress === 0).length
+      };
+
+      res.json({
+        success: true,
+        data: {
+          categories: categorizedBooks,
+          stats,
+          message: 'Thư viện sách đã được phân loại thành công'
+        }
+      });
+
+    } catch (error) {
+      console.error('Get categorized user library error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi lấy thư viện sách phân loại',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
   // Get user's wishlist
   async getUserWishlist(req, res) {
     try {

@@ -35,15 +35,6 @@ export default function BookReader() {
     fetchBook();
   }, [id]);
 
-  const navigation = {
-    navigate: (screen: string, params?: any) => {
-      // Handle any navigation if needed
-    },
-    goBack: () => {
-      router.back();
-    }
-  };
-
   if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white }}>
@@ -66,7 +57,6 @@ export default function BookReader() {
   return (
     <BookReaderScreen
       route={{ params: { book } }}
-      navigation={navigation}
     />
   );
 }
