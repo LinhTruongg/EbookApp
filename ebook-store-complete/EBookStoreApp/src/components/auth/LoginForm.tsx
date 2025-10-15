@@ -9,11 +9,13 @@ import {
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { COLORS, SIZES, COMMON_STYLES } from '../../constants';
+import { useRouter } from 'expo-router';
 
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('nguyenvanan@gmail.com'); // Pre-filled for demo
   const [password, setPassword] = useState('123456'); // Pre-filled for demo
   const { login, isLoading } = useAuth();
+  const router = useRouter();
 
 
   const handleLogin = async () => {
@@ -29,11 +31,12 @@ const LoginForm: React.FC = () => {
     try {
       console.log('🔵 LoginForm calling login...');
       await login(email, password);
+      router.push('/(tabs)');
       console.log('✅ LoginForm login successful');
       // Login successful - navigation will be handled by AuthContext
     } catch (error) {
       console.error('❌ LoginForm login error:', error);
-      Alert.alert('Login Failed', `Error: ${error.message || 'Invalid email or password'}`);
+      Alert.alert('Login Failed', `Error: ${error instanceof Error ? error.message : 'Invalid email or password'}`);
     }
   };
 

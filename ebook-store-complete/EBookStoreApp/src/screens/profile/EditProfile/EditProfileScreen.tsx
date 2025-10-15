@@ -80,16 +80,7 @@ export default function EditProfileScreen() {
 
       await updateProfile(updateData);
       
-      Alert.alert(
-        'Thành công',
-        'Cập nhật thông tin thành công',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      router.push('/(tabs)/profile');
     } catch (error) {
       console.error('Update profile error:', error);
       // Error is already handled in AuthContext

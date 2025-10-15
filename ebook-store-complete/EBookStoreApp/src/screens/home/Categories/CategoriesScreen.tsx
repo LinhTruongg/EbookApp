@@ -8,9 +8,9 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
-  Alert,
   RefreshControl,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
 import { apiService } from '../../../services/api';
@@ -19,7 +19,6 @@ import { Category } from '../../../types';
 // Extended Category interface for UI purposes
 interface CategoryWithUI extends Category {
   backgroundColor: string;
-  icon: string;
 }
 
 const CategoriesScreen: React.FC = () => {
@@ -32,21 +31,21 @@ const CategoriesScreen: React.FC = () => {
 
   // Predefined colors and icons for categories
   const categoryStyles = [
-    { backgroundColor: '#FF8C42', icon: '💕' },
-    { backgroundColor: '#8B4513', icon: '🗺️' },
-    { backgroundColor: '#D2691E', icon: '📚' },
-    { backgroundColor: '#32CD32', icon: '☕' },
-    { backgroundColor: '#2F4F4F', icon: '👻' },
-    { backgroundColor: '#20B2AA', icon: '👶' },
-    { backgroundColor: '#FFD700', icon: '💰' },
-    { backgroundColor: '#4169E1', icon: '👤' },
-    { backgroundColor: '#4B0082', icon: '🚀' },
-    { backgroundColor: '#FF6B6B', icon: '❤️' },
-    { backgroundColor: '#4ECDC4', icon: '🌊' },
-    { backgroundColor: '#45B7D1', icon: '☁️' },
-    { backgroundColor: '#96CEB4', icon: '🌱' },
-    { backgroundColor: '#FFEAA7', icon: '☀️' },
-    { backgroundColor: '#DDA0DD', icon: '🌸' },
+    { backgroundColor: '#FF8C42'},
+    { backgroundColor: '#8B4513'},
+    { backgroundColor: '#D2691E'},
+    { backgroundColor: '#32CD32'},
+    { backgroundColor: '#2F4F4F'},
+    { backgroundColor: '#20B2AA'},
+    { backgroundColor: '#FFD700'},
+    { backgroundColor: '#4169E1'},
+    { backgroundColor: '#4B0082'},
+    { backgroundColor: '#FF6B6B'},
+    { backgroundColor: '#4ECDC4'},
+    { backgroundColor: '#45B7D1'},
+    { backgroundColor: '#96CEB4'},
+    { backgroundColor: '#FFEAA7'},
+    { backgroundColor: '#DDA0DD'},
   ];
 
   useEffect(() => {
@@ -63,15 +62,14 @@ const CategoriesScreen: React.FC = () => {
         const categoriesWithUI: CategoryWithUI[] = response.data.map((category, index) => ({
           ...category,
           backgroundColor: categoryStyles[index % categoryStyles.length].backgroundColor,
-          icon: categoryStyles[index % categoryStyles.length].icon,
         }));
         setCategories(categoriesWithUI);
       } else {
-        Alert.alert('Lỗi', 'Không thể tải danh sách thể loại');
+        Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể tải danh sách thể loại' });
       }
     } catch (error) {
       console.error('Error loading categories:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách thể loại');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Không thể tải danh sách thể loại' });
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -101,9 +99,8 @@ const CategoriesScreen: React.FC = () => {
   const renderCategoryItem = ({ item }: { item: CategoryWithUI }) => (
     <TouchableOpacity
       style={[styles.categoryCard, { backgroundColor: item.backgroundColor }]}
-      onPress={() => router.push(`/category-detail/${item.id}?name=${encodeURIComponent(item.name)}&description=${encodeURIComponent(item.description || `Khám phá các cuốn sách hay nhất trong thể loại ${item.name}`)}&icon=${encodeURIComponent(item.icon)}&slug=${encodeURIComponent(item.slug)}`)}
+      onPress={() => router.push(`/category-detail/${item.id}`)}
     >
-      <Text style={styles.categoryIcon}>{item.icon}</Text>
       <Text style={styles.categoryName}>{item.name}</Text>
     </TouchableOpacity>
   );

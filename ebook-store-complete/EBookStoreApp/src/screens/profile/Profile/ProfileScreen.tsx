@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   Image,
   Modal,
   Dimensions,
@@ -13,6 +12,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 function ProfileScreen() {
   const { user, logout, isLoading } = useAuth();
@@ -20,46 +20,24 @@ function ProfileScreen() {
   const [isAvatarModalVisible, setIsAvatarModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showRemoveAvatarConfirm, setShowRemoveAvatarConfirm] = useState(false);
 
   const handleLogout = () => {
-    console.log('🚪 Logout button pressed');
-    Alert.alert(
-      'Đăng xuất',
-      'Bạn có chắc chắn muốn đăng xuất?',
-      [
-        {
-          text: 'Hủy',
-          style: 'cancel',
-        },
-        {
-          text: 'Đăng xuất',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('🚪 Logout confirmed, calling logout function...');
-            try {
-              setIsLoggingOut(true);
-              console.log('🔄 Starting logout process...');
-              
-              // Call logout function from AuthContext
-              await logout();
-              
-              console.log('✅ Logout completed successfully');
-              // Navigate to login screen using Expo Router
-              router.replace('/auth/login');
-            } catch (error) {
-              console.error('❌ Logout error:', error);
-              Alert.alert(
-                'Lỗi đăng xuất', 
-                'Không thể đăng xuất. Vui lòng thử lại.',
-                [{ text: 'OK' }]
-              );
-            } finally {
-              setIsLoggingOut(false);
-            }
-          },
-        },
-      ]
-    );
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      router.replace('/(auth)/login');
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+    } finally {
+      setIsLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -89,43 +67,17 @@ function ProfileScreen() {
     const mockImageUri = 'https://via.placeholder.com/300x300/4CAF50/FFFFFF?text=New+Avatar';
     setSelectedImage(mockImageUri);
     setIsAvatarModalVisible(false);
-    
-    Alert.alert(
-      'Thành công',
-      'Ảnh đại diện đã được cập nhật!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            // In real app, this would call API to update avatar
-            console.log('Avatar updated:', mockImageUri);
-          }
-        }
-      ]
-    );
+    console.log('Avatar updated:', mockImageUri);
   };
 
   const handleRemoveAvatar = () => {
-    Alert.alert(
-      'Xóa ảnh đại diện',
-      'Bạn có chắc chắn muốn xóa ảnh đại diện hiện tại?',
-      [
-        {
-          text: 'Hủy',
-          style: 'cancel',
-        },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => {
-            setSelectedImage(null);
-            // In real app, this would call API to remove avatar
-            console.log('Avatar removed');
-            Alert.alert('Thành công', 'Ảnh đại diện đã được xóa!');
-          },
-        },
-      ]
-    );
+    setShowRemoveAvatarConfirm(true);
+  };
+
+  const confirmRemoveAvatar = () => {
+    setSelectedImage(null);
+    console.log('Avatar removed');
+    setShowRemoveAvatarConfirm(false);
   };
 
   const closeAvatarModal = () => {
@@ -252,7 +204,7 @@ function ProfileScreen() {
         <View style={styles.quickActions}>
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => router.push('/profile/edit')}
+            onPress={() => router.push('/(tabs)/profile/edit-profile')}
           >
             <Text style={styles.quickActionEmoji}>✏️</Text>
             <Text style={styles.quickActionTitle}>Chỉnh sửa</Text>
@@ -261,7 +213,7 @@ function ProfileScreen() {
 
           <TouchableOpacity
             style={styles.quickActionCard}
-            onPress={() => router.push('/profile/change-password')}
+            onPress={() => router.push('/(tabs)/profile/change-password')}
           >
             <Text style={styles.quickActionEmoji}>🔒</Text>
             <Text style={styles.quickActionTitle}>Bảo mật</Text>
@@ -333,14 +285,14 @@ function ProfileScreen() {
       <View style={styles.actionsSection}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => router.push('/profile/edit')}
+          onPress={() => router.push('/(tabs)/profile/edit-profile')}
         >
           <Text style={styles.actionButtonText}>✏️ Cập nhật thông tin</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => router.push('/profile/change-password')}
+          onPress={() => router.push('/(tabs)/profile/change-password')}
         >
           <Text style={styles.actionButtonText}>🔒 Đổi mật khẩu</Text>
         </TouchableOpacity>
@@ -421,6 +373,28 @@ function ProfileScreen() {
           </View>
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={showLogoutConfirm}
+        title="Đăng xuất"
+        message="Bạn có chắc chắn muốn đăng xuất?"
+        confirmText="Đăng xuất"
+        cancelText="Hủy"
+        destructive
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogoutConfirm(false)}
+      />
+
+      <ConfirmDialog
+        visible={showRemoveAvatarConfirm}
+        title="Xóa ảnh đại diện"
+        message="Bạn có chắc chắn muốn xóa ảnh đại diện hiện tại?"
+        confirmText="Xóa"
+        cancelText="Hủy"
+        destructive
+        onConfirm={confirmRemoveAvatar}
+        onCancel={() => setShowRemoveAvatarConfirm(false)}
+      />
     </ScrollView>
   );
 }

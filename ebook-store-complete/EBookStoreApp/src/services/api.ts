@@ -311,6 +311,26 @@ class ApiService {
     return response.data;
   }
 
+  async getBooksByCategoryId(
+    categoryId: string,
+    options?: { page?: number; limit?: number; sortBy?: string; sortOrder?: 'ASC' | 'DESC'; minPrice?: number; maxPrice?: number }
+  ): Promise<ApiResponse<{ category: Category; books: Book[]; pagination: { total: number; page: number; limit: number; totalPages: number } }>> {
+    console.log('📂 Fetching books by category (categories/:id/books):', categoryId, options);
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', String(options.page));
+    if (options?.limit) params.append('limit', String(options.limit));
+    if (options?.sortBy) params.append('sortBy', options.sortBy);
+    if (options?.sortOrder) params.append('sortOrder', options.sortOrder);
+    if (options?.minPrice !== undefined) params.append('minPrice', String(options.minPrice));
+    if (options?.maxPrice !== undefined) params.append('maxPrice', String(options.maxPrice));
+
+    const query = params.toString();
+    const url = query ? `/categories/${categoryId}/books?${query}` : `/categories/${categoryId}/books`;
+    const response = await this.axiosInstance.get(url);
+    console.log('✅ Books by category (via categories route) fetched successfully');
+    return response.data;
+  }
+
   async getCategoryById(id: string): Promise<ApiResponse<Category>> {
     console.log('📂 Fetching category by ID:', id);
     const response = await this.axiosInstance.get(`/categories/${id}`);

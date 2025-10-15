@@ -6,13 +6,14 @@ import {
   ScrollView,
   TextInput,
   TouchableOpacity,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
+import Toast from 'react-native-toast-message';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 export default function ChangePasswordScreen() {
   const { changePassword } = useAuth();
@@ -28,6 +29,7 @@ export default function ChangePasswordScreen() {
     new: false,
     confirm: false,
   });
+  const [successDialogVisible, setSuccessDialogVisible] = useState(false);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -45,28 +47,28 @@ export default function ChangePasswordScreen() {
 
   const validateForm = () => {
     if (!formData.currentPassword.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mật khẩu hiện tại');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Vui lòng nhập mật khẩu hiện tại' });
       return false;
     }
     if (!formData.newPassword.trim()) {
-      Alert.alert('Lỗi', 'Vui lòng nhập mật khẩu mới');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Vui lòng nhập mật khẩu mới' });
       return false;
     }
     if (formData.newPassword.length < 6) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải có ít nhất 6 ký tự');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Mật khẩu mới phải có ít nhất 6 ký tự' });
       return false;
     }
     const policy = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/;
     if (!policy.test(formData.newPassword)) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải chứa ít nhất 1 chữ thường, 1 chữ hoa và 1 số');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Mật khẩu mới phải chứa ít nhất 1 chữ thường, 1 chữ hoa và 1 số' });
       return false;
     }
     if (formData.newPassword !== formData.confirmPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu xác nhận không khớp');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Mật khẩu xác nhận không khớp' });
       return false;
     }
     if (formData.currentPassword === formData.newPassword) {
-      Alert.alert('Lỗi', 'Mật khẩu mới phải khác mật khẩu hiện tại');
+      Toast.show({ type: 'error', text1: 'Lỗi', text2: 'Mật khẩu mới phải khác mật khẩu hiện tại' });
       return false;
     }
     return true;
@@ -78,37 +80,21 @@ export default function ChangePasswordScreen() {
     setLoading(true);
     try {
       await changePassword(formData.currentPassword, formData.newPassword);
-      
-      Alert.alert(
-        'Thành công',
-        'Đổi mật khẩu thành công',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setFormData({
-                currentPassword: '',
-                newPassword: '',
-                confirmPassword: '',
-              });
-              router.back();
-            },
-          },
-        ]
-      );
+      setSuccessDialogVisible(true);
     } catch (error: any) {
       console.error('Change password error:', error);
-      Alert.alert(
-        'Lỗi',
-        error?.response?.data?.message || error.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.'
-      );
+      Toast.show({
+        type: 'error',
+        text1: 'Lỗi',
+        text2: error?.response?.data?.message || error.message || 'Không thể đổi mật khẩu. Vui lòng thử lại.',
+      });
     } finally {
       setLoading(false);
     }
   };
 
   const getPasswordStrength = (password: string) => {
-    if (password.length === 0) return { strength: 0, text: '', color: COLORS.gray };
+    if (password.length === 0) return { strength: 0, text: '', color: COLORS.gray400 };
     if (password.length < 6) return { strength: 1, text: 'Yếu', color: COLORS.error };
     if (password.length < 8) return { strength: 2, text: 'Trung bình', color: COLORS.warning };
     if (password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
@@ -138,7 +124,7 @@ export default function ChangePasswordScreen() {
                 value={formData.currentPassword}
                 onChangeText={(value) => handleInputChange('currentPassword', value)}
                 placeholder="Nhập mật khẩu hiện tại"
-                placeholderTextColor={COLORS.gray}
+                placeholderTextColor={COLORS.textPlaceholder}
                 secureTextEntry={!showPasswords.current}
               />
               <TouchableOpacity
@@ -160,7 +146,7 @@ export default function ChangePasswordScreen() {
                 value={formData.newPassword}
                 onChangeText={(value) => handleInputChange('newPassword', value)}
                 placeholder="Nhập mật khẩu mới"
-                placeholderTextColor={COLORS.gray}
+                placeholderTextColor={COLORS.textPlaceholder}
                 secureTextEntry={!showPasswords.new}
               />
               <TouchableOpacity
@@ -201,7 +187,7 @@ export default function ChangePasswordScreen() {
                 value={formData.confirmPassword}
                 onChangeText={(value) => handleInputChange('confirmPassword', value)}
                 placeholder="Nhập lại mật khẩu mới"
-                placeholderTextColor={COLORS.gray}
+                placeholderTextColor={COLORS.textPlaceholder}
                 secureTextEntry={!showPasswords.confirm}
               />
               <TouchableOpacity
@@ -252,6 +238,18 @@ export default function ChangePasswordScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
+      <ConfirmDialog
+        visible={successDialogVisible}
+        title="Thành công"
+        message="Đổi mật khẩu thành công"
+        confirmText="OK"
+        onConfirm={() => {
+          setSuccessDialogVisible(false);
+          setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+          router.back();
+        }}
+        onCancel={() => setSuccessDialogVisible(false)}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -291,7 +289,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.border,
     borderRadius: 8,
     backgroundColor: COLORS.white,
   },
@@ -312,7 +310,7 @@ const styles = StyleSheet.create({
   },
   strengthBar: {
     height: 4,
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.border,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -339,7 +337,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   requirementsContainer: {
-    backgroundColor: COLORS.lightGray,
+    backgroundColor: COLORS.gray100,
     padding: 15,
     borderRadius: 8,
     marginTop: 10,
@@ -376,7 +374,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.border,
   },
   cancelButtonText: {
     color: COLORS.text,

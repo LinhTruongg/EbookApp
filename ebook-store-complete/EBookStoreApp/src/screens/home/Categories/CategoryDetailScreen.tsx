@@ -11,6 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { COLORS, SIZES, COMMON_STYLES } from '../../../constants';
+import { apiService } from '../../../services/api';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -34,82 +35,52 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for books in this category
-    const mockBooks = [
-      {
-        id: '1',
-        title: 'TÔI TÀI GIỎI BẠN CŨNG THẾ!',
-        author: 'Adam Khoo',
-        coverImage: 'https://via.placeholder.com/150x200/4CAF50/FFFFFF?text=TÔI+TÀI+GIỎI',
-        price: '99.000đ',
-        originalPrice: '149.000đ',
-        rating: 4.5,
-        reviews: 128,
-        description: 'Cuốn sách giúp bạn phát triển tư duy và kỹ năng học tập hiệu quả.',
-      },
-      {
-        id: '2',
-        title: 'NGHỆ THUẬT GIAO TIẾP ĐỂ THÀNH CÔNG',
-        author: 'Unknown',
-        coverImage: 'https://via.placeholder.com/150x200/FFC107/000000?text=NGHỆ+THUẬT',
-        price: '89.000đ',
-        originalPrice: '129.000đ',
-        rating: 4.2,
-        reviews: 95,
-        description: 'Học cách giao tiếp hiệu quả để đạt được thành công trong cuộc sống.',
-      },
-      {
-        id: '3',
-        title: 'Tuổi trẻ đáng giá bao nhiêu?',
-        author: 'Rosie Nguyễn',
-        coverImage: 'https://via.placeholder.com/150x200/2196F3/FFFFFF?text=Tuổi+trẻ',
-        price: '79.000đ',
-        originalPrice: '119.000đ',
-        rating: 4.7,
-        reviews: 203,
-        description: 'Những bài học quý giá về tuổi trẻ và cách sống có ý nghĩa.',
-      },
-      {
-        id: '4',
-        title: 'DẠY CON LÀM GIÀU',
-        author: 'Robert Kiyosaki',
-        coverImage: 'https://via.placeholder.com/150x200/9C27B0/FFFFFF?text=RICH+DAD',
-        price: '109.000đ',
-        originalPrice: '159.000đ',
-        rating: 4.4,
-        reviews: 156,
-        description: 'Kiến thức về tài chính và cách xây dựng sự giàu có.',
-      },
-      {
-        id: '5',
-        title: 'trên đường bằng',
-        author: 'Unknown',
-        coverImage: 'https://via.placeholder.com/150x200/000000/FFFFFF?text=trên+đường',
-        price: '69.000đ',
-        originalPrice: '99.000đ',
-        rating: 4.1,
-        reviews: 87,
-        description: 'Hành trình khám phá bản thân và tìm kiếm ý nghĩa cuộc sống.',
-      },
-      {
-        id: '6',
-        title: 'ĐẮC NHÂN TÂM',
-        author: 'Dale Carnegie',
-        coverImage: 'https://via.placeholder.com/150x200/F44336/FFFFFF?text=ĐẮC+NHÂN+TÂM',
-        price: '95.000đ',
-        originalPrice: '139.000đ',
-        rating: 4.6,
-        reviews: 312,
-        description: 'Nghệ thuật thu phục lòng người và xây dựng mối quan hệ tốt đẹp.',
-      },
-    ];
+    let isMounted = true;
+    const fetchBooks = async () => {
+      try {
+        setLoading(true);
+        const response = await apiService.getBooksByCategoryId(String(category.id));
+        const serverBooks = (response.data?.books || []).map((b: any) => {
+          const authorNames = Array.isArray(b.authors) && b.authors.length > 0 ? b.authors.map((a: any) => a.name).join(', ') : '';
+          const hasDiscount = b.discountPrice && Number(b.discountPrice) < Number(b.price);
+          const finalPrice = hasDiscount ? Number(b.discountPrice) : Number(b.price);
+          return {
+            id: String(b.id),
+            title: b.title,
+            author: authorNames,
+            coverImage: b.coverImage,
+            price: formatCurrency(finalPrice),
+            originalPrice: hasDiscount ? formatCurrency(Number(b.price)) : undefined,
+            rating: Number(b.rating || 0),
+            reviews: Number(b.totalReviews || 0),
+            description: b.description,
+          };
+        });
+        if (isMounted) {
+          setBooks(serverBooks);
+        }
+      } catch (e) {
+        if (isMounted) {
+          setBooks([]);
+        }
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
 
-    // Simulate loading
-    setTimeout(() => {
-      setBooks(mockBooks);
-      setLoading(false);
-    }, 1000);
+    fetchBooks();
+    return () => {
+      isMounted = false;
+    };
   }, [category]);
+
+  const formatCurrency = (value: number) => {
+    try {
+      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
+    } catch {
+      return `${Math.round(value).toLocaleString('vi-VN')} đ`;
+    }
+  };
 
   const renderBookItem = ({ item }: { item: any }) => (
     <TouchableOpacity
@@ -126,7 +97,9 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
         </View>
         <View style={styles.priceContainer}>
           <Text style={styles.price}>{item.price}</Text>
-          <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+          {item.originalPrice ? (
+            <Text style={styles.originalPrice}>{item.originalPrice}</Text>
+          ) : null}
         </View>
       </View>
     </TouchableOpacity>

@@ -234,7 +234,6 @@ export const COMMON_STYLES = {
   textButton: {
     color: COLORS.textInverse,
     fontSize: SIZES.font.md,
-    fontWeight: '600',
   },
   textButtonSecondary: {
     color: COLORS.primary,

@@ -11,6 +11,8 @@ export default function Login() {
         router.push('/(auth)/register');
       } else if (screen === 'ForgotPassword') {
         router.push('/(auth)/forgot-password');
+      } else if (screen === 'Home') {
+        router.push('/(tabs)');
       }
     }
   };
