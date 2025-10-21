@@ -175,8 +175,8 @@ export const COMMON_STYLES = {
     paddingVertical: SIZES.spacing.md,
     paddingHorizontal: SIZES.spacing.lg,
     borderRadius: SIZES.borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     minHeight: SIZES.button.md,
   },
   buttonPrimary: {
@@ -184,8 +184,8 @@ export const COMMON_STYLES = {
     paddingVertical: SIZES.spacing.md,
     paddingHorizontal: SIZES.spacing.lg,
     borderRadius: SIZES.borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     minHeight: SIZES.button.md,
   },
   buttonSecondary: {
@@ -195,8 +195,8 @@ export const COMMON_STYLES = {
     paddingVertical: SIZES.spacing.md,
     paddingHorizontal: SIZES.spacing.lg,
     borderRadius: SIZES.borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
     minHeight: SIZES.button.md,
   },
   

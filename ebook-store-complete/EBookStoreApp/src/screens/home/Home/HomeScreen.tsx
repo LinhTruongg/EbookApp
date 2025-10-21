@@ -17,6 +17,7 @@ import { COLORS, SIZES } from '../../../constants';
 import { apiService } from '../../../services/api';
 import { Book } from '../../../types';
 import { useRouter } from 'expo-router';
+import SearchBar from '../../../components/common/SearchBar';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -34,6 +35,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
   const [newReleaseBooks, setNewReleaseBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  
 
   console.log('🏠 HomeScreen - RENDERED! Welcome to the app!');
   console.log('🏠 HomeScreen - User:', user?.firstName, user?.lastName);
@@ -41,6 +43,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
   useEffect(() => {
     loadBooksData();
   }, []);
+
 
   const loadBooksData = async () => {
     try {
@@ -82,6 +85,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
   const handleRefresh = () => {
     setIsRefreshing(true);
     loadBooksData();
+  };
+
+  const handleBookSelect = (book: Book) => {
+    router.push(`/book-detail/${book.id}`);
   };
 
   // Get books based on active tab
@@ -194,6 +201,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
     </View>
   );
 
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -215,9 +223,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
               </TouchableOpacity>
             ))}
           </View>
-          <TouchableOpacity style={styles.searchButton} onPress={handleSearchPress}>
-            <Text style={styles.searchIcon}>🔍</Text>
-          </TouchableOpacity>
+          <SearchBar onBookSelect={handleBookSelect} />
         </View>
       </View>
 
@@ -319,6 +325,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
           </>
         )}
       </ScrollView>
+
     </View>
   );
 }
@@ -524,6 +531,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SIZES.spacing.lg,
     marginBottom: SIZES.spacing.md,
   },
+
 });
 
 export default HomeScreen;

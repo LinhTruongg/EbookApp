@@ -389,8 +389,16 @@ class BookController {
   // Add/remove book from wishlist
   async toggleWishlist(req, res) {
     try {
-      const { bookId } = req.params;
+      const { id } = req.params;
+      const bookId = id;
       const userId = req.user.id;
+
+      if (!bookId) {
+        return res.status(400).json({
+          success: false,
+          message: 'Thiếu mã sách'
+        });
+      }
 
       const existingWishlist = await Wishlist.findOne({
         where: { userId, bookId }
@@ -605,8 +613,8 @@ class BookController {
         isFeatured,
         isBestseller,
         isNewRelease,
-        tags: tags ? JSON.stringify(tags) : null,
-        metadata: metadata ? JSON.stringify(metadata) : null
+        tags: tags ?? null,
+        metadata: metadata ?? null
       });
 
       // Add authors if provided
@@ -710,8 +718,8 @@ class BookController {
       if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
       if (isBestseller !== undefined) updateData.isBestseller = isBestseller;
       if (isNewRelease !== undefined) updateData.isNewRelease = isNewRelease;
-      if (tags !== undefined) updateData.tags = tags ? JSON.stringify(tags) : null;
-      if (metadata !== undefined) updateData.metadata = metadata ? JSON.stringify(metadata) : null;
+      if (tags !== undefined) updateData.tags = tags ?? null;
+      if (metadata !== undefined) updateData.metadata = metadata ?? null;
 
       await book.update(updateData);
 
@@ -750,6 +758,72 @@ class BookController {
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi cập nhật sách',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get suggested books based on category and similar books
+  async getSuggestedBooks(req, res) {
+    try {
+      const { id } = req.params;
+      const { limit = 6 } = req.query;
+
+      const currentBook = await Book.findByPk(id, {
+        include: [{
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        }]
+      });
+
+      if (!currentBook) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sách'
+        });
+      }
+
+      // Get books from same category, excluding current book
+      const suggestedBooks = await Book.findAll({
+        where: {
+          id: { [Op.ne]: id },
+          categoryId: currentBook.categoryId,
+          status: 'active'
+        },
+        include: [
+          {
+            model: Category,
+            as: 'category',
+            attributes: ['id', 'name', 'slug']
+          },
+          {
+            model: Author,
+            as: 'authors',
+            attributes: ['id', 'name'],
+            through: {
+              attributes: []
+            }
+          }
+        ],
+        order: [
+          ['rating', 'DESC'],
+          ['totalReviews', 'DESC'],
+          ['createdAt', 'DESC']
+        ],
+        limit: parseInt(limit)
+      });
+
+      res.json({
+        success: true,
+        data: suggestedBooks
+      });
+
+    } catch (error) {
+      console.error('Get suggested books error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi lấy sách gợi ý',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

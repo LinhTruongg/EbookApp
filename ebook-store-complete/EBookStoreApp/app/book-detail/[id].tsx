@@ -10,6 +10,7 @@ export default function BookDetail() {
   const { id } = useLocalSearchParams();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
+  const [inWishlist, setInWishlist] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
@@ -22,6 +23,9 @@ export default function BookDetail() {
         const response = await apiService.getBookById(bookId);
         if (response.success && response.data) {
           setBook(response.data.book);
+          if ((response.data as any).userInfo) {
+            setInWishlist(!!(response.data as any).userInfo.isInWishlist);
+          }
         }
       } catch (err) {
         setError('Failed to load book details');
@@ -50,6 +54,5 @@ export default function BookDetail() {
       </View>
     );
   }
-
-  return <BookDetailScreen book={book} />;
+  return <BookDetailScreen book={book} initialInWishlist={inWishlist} />;
 }

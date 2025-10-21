@@ -150,7 +150,9 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         publicationDate: formData.publicationDate || undefined,
         pageCount: formData.pageCount ? parseInt(formData.pageCount) : undefined,
         language: formData.language,
-        authorIds: formData.authorIds,
+        authorIds: (formData.authorIds || [])
+          .map((id) => parseInt(String(id), 10))
+          .filter((n) => Number.isFinite(n)),
         status: formData.status,
         isFeatured: formData.isFeatured,
         isBestseller: formData.isBestseller,
@@ -213,9 +215,9 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
   };
 
   const filteredBooks = books.filter(book =>
-    book.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    book.isbn?.toLowerCase().includes(searchQuery.toLowerCase())
+    (book.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (book.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (book.isbn || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderBookItem = ({ item }: { item: Book }) => (
@@ -258,7 +260,7 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               isbn: item.isbn || '',
               price: item.price.toString(),
               discountPrice: item.discountPrice?.toString() || '',
-              categoryId: item.categoryId?.toString() || '',
+              categoryId: (item as any).categoryId?.toString() || '',
               publisher: item.publisher || '',
               publicationDate: item.publicationDate || '',
               pageCount: item.pageCount?.toString() || '',
@@ -321,7 +323,7 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
       <FlatList
         data={filteredBooks}
         renderItem={renderBookItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => String((item as any).id)}
         style={styles.booksList}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -440,13 +442,13 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
                     key={category.id}
                     style={[
                       styles.categoryChip,
-                      formData.categoryId === category.id && styles.selectedCategoryChip
+                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChip
                     ]}
-                    onPress={() => setFormData({ ...formData, categoryId: category.id })}
+                    onPress={() => setFormData({ ...formData, categoryId: String((category as any).id) })}
                   >
                     <Text style={[
                       styles.categoryChipText,
-                      formData.categoryId === category.id && styles.selectedCategoryChipText
+                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChipText
                     ]}>
                       {category.name}
                     </Text>

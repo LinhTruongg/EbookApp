@@ -11,14 +11,20 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
 import { apiService } from '../../../services/api';
 import { Book } from '../../../types';
+import { eventBus } from '../../../utils/eventBus';
 
 const LibraryScreen: React.FC = () => {
   const router = useRouter();
+  const { width: screenWidth } = Dimensions.get('window');
+  const H_PADDING = 20; // matches booksContainer paddingHorizontal
+  const ITEM_GAP = 16; // visual gap between two columns
+  const ITEM_WIDTH = (screenWidth - H_PADDING * 2 - ITEM_GAP) / 2;
   const [activeTab, setActiveTab] = useState<'reading' | 'favorited' | 'completed'>('reading');
   const [books, setBooks] = useState<{
     reading: Book[];
@@ -50,29 +56,55 @@ const LibraryScreen: React.FC = () => {
   // Load library data from API
   useEffect(() => {
     loadLibraryData();
+    const off = eventBus.on('wishlist:toggle', ({ book, inWishlist }: any) => {
+      setBooks(prev => {
+        const map: Record<string, Book> = {};
+        prev.favorited.forEach(b => { map[b.id] = b; });
+        if (inWishlist) {
+          map[book.id] = book;
+        } else {
+          delete map[book.id];
+        }
+        const favorited = Object.values(map) as Book[];
+        return { ...prev, favorited };
+      });
+      setStatistics(prev => ({ ...prev, favorited: (prev.favorited || 0) + (inWishlist ? 1 : -1) }));
+    });
+    return () => { off && off(); };
   }, []);
 
   const loadLibraryData = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getUserLibraryCategorized();
-      console.log('Library response:', response);
-      
-      if (response.success && response.data) {
-        setBooks({
-          reading: response.data.categories.reading.map(item => item.book) || [],
-          favorited: response.data.categories.favorited.map(item => item.book) || [],
-          completed: response.data.categories.completed.map(item => item.book) || [],
-        });
-        setStatistics(response.data.statistics || {
+      const [libRes, wishRes] = await Promise.all([
+        apiService.getUserLibraryCategorized(),
+        apiService.getUserWishlist().catch(() => ({ success: false }))
+      ]);
+
+      if (libRes.success && libRes.data) {
+        const reading = libRes.data.categories.reading.map((item: any) => item.book) || [];
+        const completed = libRes.data.categories.completed.map((item: any) => item.book) || [];
+        const favoritedFromLib = libRes.data.categories.favorited.map((item: any) => item.book) || [];
+
+        const wishlistBooks = wishRes.success && (wishRes as any).data?.wishlist
+          ? (wishRes as any).data.wishlist.map((w: any) => w.book)
+          : [];
+
+        // Union by id for favorited
+        const favoritedMap: Record<string, any> = {};
+        [...favoritedFromLib, ...wishlistBooks].forEach((b: any) => { favoritedMap[b.id] = b; });
+        const favorited = Object.values(favoritedMap) as Book[];
+
+        setBooks({ reading, favorited, completed });
+        setStatistics(libRes.data.statistics || {
           totalBooks: 0,
-          reading: 0,
-          favorited: 0,
-          completed: 0,
+          reading: reading.length,
+          favorited: favorited.length,
+          completed: completed.length,
           unread: 0,
         });
       } else {
-        Alert.alert('Lỗi', response.message || 'Không thể tải thư viện');
+        Alert.alert('Lỗi', (libRes as any).message || 'Không thể tải thư viện');
       }
     } catch (error) {
       console.error('Error loading library:', error);
@@ -151,7 +183,7 @@ const LibraryScreen: React.FC = () => {
 
   const renderBookItem = ({ item }: { item: Book }) => (
     <TouchableOpacity 
-      style={styles.bookItem}
+      style={[styles.bookItem, { width: ITEM_WIDTH }]}
       onPress={() => handleBookPress(item)}
     >
       <Image source={{ uri: item.coverImage || 'https://via.placeholder.com/150x200' }} style={styles.bookCover} />
@@ -270,6 +302,7 @@ const LibraryScreen: React.FC = () => {
             keyExtractor={(item) => item.id}
             numColumns={2}
             contentContainerStyle={styles.booksList}
+            columnWrapperStyle={{ justifyContent: 'space-between' }}
             showsVerticalScrollIndicator={false}
           />
         ) : (
@@ -405,8 +438,7 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
   },
   bookItem: {
-    flex: 1,
-    margin: 8,
+    marginBottom: 16,
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 12,

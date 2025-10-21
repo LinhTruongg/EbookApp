@@ -6,34 +6,54 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  SafeAreaView,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, SIZES } from '../../constants';
 
-interface ConfirmDialogProps {
+interface AdvancedConfirmDialogProps {
   visible: boolean;
   title: string;
-  message: string;
+  message?: string;
   confirmText?: string;
   cancelText?: string;
-  type?: 'danger' | 'warning' | 'info';
+  type?: 'danger' | 'warning' | 'info' | 'success';
+  loading?: boolean;
+  showIcon?: boolean;
+  customIcon?: keyof typeof Ionicons.glyphMap;
+  customContent?: React.ReactNode;
   onConfirm: () => void;
   onCancel: () => void;
+  destructive?: boolean;
 }
 
 const { width } = Dimensions.get('window');
 
-const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
+const AdvancedConfirmDialog: React.FC<AdvancedConfirmDialogProps> = ({
   visible,
   title,
   message,
   confirmText = 'Xác nhận',
   cancelText = 'Hủy',
   type = 'danger',
+  loading = false,
+  showIcon = true,
+  customIcon,
+  customContent,
   onConfirm,
   onCancel,
+  destructive = true,
 }) => {
   const getIconAndColor = () => {
+    if (customIcon) {
+      return {
+        icon: customIcon,
+        color: destructive ? '#EF4444' : COLORS.primary,
+        backgroundColor: destructive ? '#FEF2F2' : '#EFF6FF',
+        borderColor: destructive ? '#FECACA' : '#BFDBFE',
+      };
+    }
+
     switch (type) {
       case 'danger':
         return {
@@ -55,6 +75,13 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           color: '#3B82F6',
           backgroundColor: '#EFF6FF',
           borderColor: '#BFDBFE',
+        };
+      case 'success':
+        return {
+          icon: 'checkmark-circle-outline' as keyof typeof Ionicons.glyphMap,
+          color: '#10B981',
+          backgroundColor: '#ECFDF5',
+          borderColor: '#A7F3D0',
         };
       default:
         return {
@@ -78,16 +105,26 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       <View style={styles.overlay}>
         <View style={styles.dialogContainer}>
           <View style={[styles.dialog, { borderColor }]}>
-            {/* Icon */}
-            <View style={[styles.iconContainer, { backgroundColor }]}>
-              <Ionicons name={icon} size={32} color={color} />
+            {/* Header */}
+            <View style={styles.header}>
+              {showIcon && (
+                <View style={[styles.iconContainer, { backgroundColor }]}>
+                  <Ionicons name={icon} size={32} color={color} />
+                </View>
+              )}
+              <Text style={styles.title}>{title}</Text>
             </View>
 
             {/* Content */}
-            <View style={styles.content}>
-              <Text style={styles.title}>{title}</Text>
-              <Text style={styles.message}>{message}</Text>
-            </View>
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+              {customContent ? (
+                customContent
+              ) : (
+                message && (
+                  <Text style={styles.message}>{message}</Text>
+                )
+              )}
+            </ScrollView>
 
             {/* Actions */}
             <View style={styles.actions}>
@@ -95,6 +132,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={[styles.button, styles.cancelButton]}
                 onPress={onCancel}
                 activeOpacity={0.7}
+                disabled={loading}
               >
                 <Text style={styles.cancelButtonText}>{cancelText}</Text>
               </TouchableOpacity>
@@ -103,12 +141,21 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={[
                   styles.button,
                   styles.confirmButton,
-                  { backgroundColor: color }
+                  { backgroundColor: color },
+                  loading && styles.disabledButton
                 ]}
                 onPress={onConfirm}
                 activeOpacity={0.7}
+                disabled={loading}
               >
-                <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <Ionicons name="hourglass" size={16} color={COLORS.white} />
+                    <Text style={styles.confirmButtonText}>Đang xử lý...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -121,7 +168,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -129,11 +176,11 @@ const styles = StyleSheet.create({
   dialogContainer: {
     width: '100%',
     maxWidth: 400,
+    maxHeight: '90%',
   },
   dialog: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.borderRadius.xl,
     borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: {
@@ -144,62 +191,79 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
+  header: {
+    alignItems: 'center',
+    paddingTop: SIZES.spacing.xl,
+    paddingHorizontal: SIZES.spacing.xl,
+    paddingBottom: SIZES.spacing.md,
+  },
   iconContainer: {
     width: 64,
     height: 64,
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  content: {
-    alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: SIZES.spacing.md,
   },
   title: {
-    fontSize: 20,
+    fontSize: SIZES.font.xl,
     fontWeight: '700',
-    color: '#1F2937',
+    color: COLORS.text,
     textAlign: 'center',
-    marginBottom: 8,
+  },
+  content: {
+    maxHeight: 300,
+    paddingHorizontal: SIZES.spacing.xl,
+    marginBottom: SIZES.spacing.lg,
   },
   message: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: SIZES.font.md,
+    color: COLORS.textSecondary,
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 22,
   },
   actions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: SIZES.spacing.md,
+    paddingHorizontal: SIZES.spacing.xl,
+    paddingBottom: SIZES.spacing.xl,
+    paddingTop: SIZES.spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: SIZES.spacing.md,
+    borderRadius: SIZES.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.background,
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: COLORS.border,
   },
   confirmButton: {
     // backgroundColor sẽ được set động
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.spacing.xs,
+  },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: SIZES.font.md,
     fontWeight: '600',
-    color: '#374151',
+    color: COLORS.textSecondary,
   },
   confirmButtonText: {
-    fontSize: 16,
+    fontSize: SIZES.font.md,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: COLORS.white,
   },
 });
 
-export default ConfirmDialog;
+export default AdvancedConfirmDialog;

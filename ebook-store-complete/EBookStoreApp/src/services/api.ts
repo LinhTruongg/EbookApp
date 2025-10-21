@@ -268,6 +268,11 @@ class ApiService {
     return response.data;
   }
 
+  async getUserWishlist(): Promise<ApiResponse<{ wishlist: Array<{ book: Book }> }>> {
+    const response = await this.axiosInstance.get('/users/wishlist');
+    return response.data as any;
+  }
+
   async uploadAvatar(imageUri: string): Promise<ApiResponse<{ avatar: string }>> {
     console.log('🔄 Uploading avatar:', imageUri);
     
@@ -408,6 +413,12 @@ class ApiService {
     console.log('📖 Fetching book details:', bookId);
     const response = await this.axiosInstance.get(`/books/${bookId}`);
     console.log('✅ Book details fetched successfully');
+    return response.data;
+  }
+
+  async toggleWishlist(bookId: string): Promise<ApiResponse<{ inWishlist: boolean }>> {
+    console.log('🌟 Toggling wishlist for book:', bookId);
+    const response = await this.axiosInstance.post(`/books/${bookId}/wishlist`);
     return response.data;
   }
 
@@ -590,6 +601,73 @@ class ApiService {
     console.log('❤️ Liking comment:', commentId);
     const response = await this.axiosInstance.post(`/comments/${commentId}/like`);
     console.log('✅ Comment liked successfully');
+    return response.data;
+  }
+
+  // ===== ADMIN COMMENT METHODS =====
+
+  async getAllCommentsAdmin(params: {
+    page?: number;
+    limit?: number;
+    status?: 'all' | 'approved' | 'pending';
+    search?: string;
+    bookId?: string;
+    userId?: string;
+  } = {}): Promise<ApiResponse<{
+    comments: any[];
+    pagination: {
+      currentPage: number;
+      totalPages: number;
+      totalComments: number;
+      hasNextPage: boolean;
+    };
+  }>> {
+    console.log('💬 Fetching all comments for admin:', params);
+    const queryParams = new URLSearchParams();
+    
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.status) queryParams.append('status', params.status);
+    if (params.search) queryParams.append('search', params.search);
+    if (params.bookId) queryParams.append('bookId', params.bookId);
+    if (params.userId) queryParams.append('userId', params.userId);
+    
+    const response = await this.axiosInstance.get(`/comments/admin/all?${queryParams.toString()}`);
+    console.log('✅ All comments fetched successfully for admin');
+    return response.data;
+  }
+
+  async getAdminCommentStats(): Promise<ApiResponse<{
+    totalComments: number;
+    approvedComments: number;
+    pendingComments: number;
+    totalLikes: number;
+    recentComments: number;
+  }>> {
+    console.log('📊 Fetching admin comment stats...');
+    const response = await this.axiosInstance.get('/comments/admin/stats');
+    console.log('✅ Admin comment stats fetched successfully');
+    return response.data;
+  }
+
+  async updateCommentStatus(commentId: string, isApproved: boolean): Promise<ApiResponse<any>> {
+    console.log(`✏️ Updating comment status for ${commentId}:`, isApproved);
+    const response = await this.axiosInstance.put(`/comments/admin/${commentId}/status`, { isApproved });
+    console.log('✅ Comment status updated successfully');
+    return response.data;
+  }
+
+  async adminDeleteComment(commentId: string): Promise<ApiResponse<any>> {
+    console.log(`🗑️ Admin deleting comment:`, commentId);
+    const response = await this.axiosInstance.delete(`/comments/admin/${commentId}`);
+    console.log('✅ Comment deleted successfully by admin');
+    return response.data;
+  }
+
+  async getSuggestedBooks(bookId: string, limit: number = 6): Promise<ApiResponse<Book[]>> {
+    console.log('💡 Fetching suggested books for:', bookId);
+    const response = await this.axiosInstance.get(`/books/${bookId}/suggested?limit=${limit}`);
+    console.log('✅ Suggested books fetched successfully');
     return response.data;
   }
 }

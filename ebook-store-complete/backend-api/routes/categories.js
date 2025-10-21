@@ -37,7 +37,7 @@ router.get('/:id/books', categoryController.getBooksByCategory);
  *     tags: [Categories]
  *     summary: Get category by ID
  */
-router.get('/:id', authenticateToken, categoryController.getCategoryById);
+router.get('/:id', categoryController.getCategoryById);
 
 /**
  * @swagger

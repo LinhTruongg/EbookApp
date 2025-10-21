@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 const LoginForm: React.FC = () => {
   const [email, setEmail] = useState('nguyenvanan@gmail.com'); // Pre-filled for demo
   const [password, setPassword] = useState('123456'); // Pre-filled for demo
-  const { login, isLoading } = useAuth();
+  const { login, isLoading, user } = useAuth();
   const router = useRouter();
 
 
@@ -30,10 +30,16 @@ const LoginForm: React.FC = () => {
 
     try {
       console.log('🔵 LoginForm calling login...');
-      await login(email, password);
-      router.push('/(tabs)');
-      console.log('✅ LoginForm login successful');
-      // Login successful - navigation will be handled by AuthContext
+      const loggedInUser = await login(email, password);
+      
+      // Check user role and navigate accordingly
+      if (loggedInUser?.role === 'admin') {
+        router.push('/admin/dashboard');
+        console.log('✅ Admin login successful - redirected to admin dashboard');
+      } else {
+        router.push('/(tabs)');
+        console.log('✅ User login successful - redirected to user tabs');
+      }
     } catch (error) {
       console.error('❌ LoginForm login error:', error);
       Alert.alert('Login Failed', `Error: ${error instanceof Error ? error.message : 'Invalid email or password'}`);

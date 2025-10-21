@@ -98,7 +98,7 @@ interface AuthProviderProps {
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
-  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadStoredAuthData();
@@ -191,7 +191,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const login = async (email: string, password: string): Promise<void> => {
+  const login = async (email: string, password: string): Promise<User> => {
     try {
       console.log('🔵 AuthContext.login called with:', { email });
       dispatch({ type: 'AUTH_LOADING', payload: true });
@@ -220,6 +220,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           text2: response.message,
         });
         console.log('✅ AuthContext.login successful - ALL STEPS COMPLETED');
+        
+        // Return user data for navigation logic
+        return response.data.user;
       } else {
         console.log('❌ Response.success is false:', response.success);
         console.log('❌ Response message:', response.message);

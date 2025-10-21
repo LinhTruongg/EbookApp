@@ -3,24 +3,24 @@ import { Platform } from 'react-native';
 // Function to get the correct localhost URL based on platform
 const getBaseUrl = () => {
   if (__DEV__) {
-    // For web development, always use localhost
     if (typeof window !== 'undefined') {
       return 'http://localhost:3000';
     }
-    
-    // For React Native/Expo development, use machine IP
-    const MACHINE_IP = '192.168.2.25'; // Your machine's IP address
-    return `http://${MACHINE_IP}:3000`;
+    if (Platform.OS === 'android') {
+      // Android emulator uses 10.0.2.2; physical device uses machine IP
+      return 'http://10.0.2.2:3000';
+    }
+    // iOS simulator/physical device on same LAN
+    return 'http://192.168.2.25:3000';
   }
   return 'https://your-production-api.com';
 };
 
 // Alternative URLs to try if primary fails
 export const FALLBACK_URLS = [
-  'http://localhost:3000',    // Local development (for web/Expo web)
-  'http://127.0.0.1:3000',    // IP localhost
-  'http://10.0.2.2:3000',     // Android emulator (if running on Android)
-  'http://192.168.2.25:3000', // Machine IP (duplicate for testing)
+  'http://10.0.2.2:3000',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000'
 ];
 
 export const API_CONFIG = {

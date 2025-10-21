@@ -424,11 +424,299 @@ const getCommentStats = async (req, res) => {
   }
 };
 
+// Admin functions
+// Get all comments for admin management
+const getAllComments = async (req, res) => {
+  try {
+    const { 
+      page = 1, 
+      limit = 20, 
+      status = 'all', // 'all', 'approved', 'pending'
+      search = '',
+      bookId = null,
+      userId = null
+    } = req.query;
+
+    const offset = (page - 1) * limit;
+    const whereClause = {};
+
+    // Filter by approval status
+    if (status === 'approved') {
+      whereClause.isApproved = true;
+    } else if (status === 'pending') {
+      whereClause.isApproved = false;
+    }
+
+    // Filter by book
+    if (bookId) {
+      whereClause.bookId = parseInt(bookId);
+    }
+
+    // Filter by user
+    if (userId) {
+      whereClause.userId = parseInt(userId);
+    }
+
+    // Search in content
+    if (search) {
+      whereClause.content = {
+        [Op.iLike]: `%${search}%`
+      };
+    }
+
+    const comments = await Comment.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'lastName', 'email', 'avatar']
+        },
+        {
+          model: Book,
+          as: 'book',
+          attributes: ['id', 'title', 'coverImage']
+        },
+        {
+          model: Comment,
+          as: 'parent',
+          attributes: ['id', 'content'],
+          include: [
+            {
+              model: User,
+              as: 'user',
+              attributes: ['id', 'firstName', 'lastName']
+            }
+          ]
+        },
+        {
+          model: Comment,
+          as: 'replies',
+          attributes: ['id'],
+          required: false
+        }
+      ],
+      order: [['createdAt', 'DESC']],
+      limit: parseInt(limit),
+      offset: offset
+    });
+
+    const formattedComments = comments.rows.map(comment => ({
+      id: comment.id,
+      content: comment.content,
+      isApproved: comment.isApproved,
+      likesCount: comment.likesCount,
+      createdAt: comment.createdAt,
+      timeAgo: comment.getTimeAgo(),
+      user: {
+        id: comment.user.id,
+        name: `${comment.user.firstName} ${comment.user.lastName}`,
+        email: comment.user.email,
+        avatar: comment.user.avatar
+      },
+      book: {
+        id: comment.book.id,
+        title: comment.book.title,
+        coverImage: comment.book.coverImage
+      },
+      parent: comment.parent ? {
+        id: comment.parent.id,
+        content: comment.parent.content,
+        user: {
+          id: comment.parent.user.id,
+          name: `${comment.parent.user.firstName} ${comment.parent.user.lastName}`
+        }
+      } : null,
+      repliesCount: comment.replies.length,
+      isReply: comment.isReply()
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        comments: formattedComments,
+        pagination: {
+          currentPage: parseInt(page),
+          totalPages: Math.ceil(comments.count / limit),
+          totalComments: comments.count,
+          hasNextPage: offset + parseInt(limit) < comments.count
+        }
+      },
+      message: 'Lấy danh sách bình luận thành công'
+    });
+  } catch (error) {
+    console.error('Error getting all comments:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy danh sách bình luận',
+      error: error.message
+    });
+  }
+};
+
+// Approve/Reject comment
+const updateCommentStatus = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+    const { isApproved } = req.body;
+
+    const comment = await Comment.findByPk(commentId, {
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: Book,
+          as: 'book',
+          attributes: ['id', 'title']
+        }
+      ]
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bình luận'
+      });
+    }
+
+    await comment.update({ isApproved });
+
+    res.json({
+      success: true,
+      data: {
+        id: comment.id,
+        isApproved: comment.isApproved,
+        user: {
+          id: comment.user.id,
+          name: `${comment.user.firstName} ${comment.user.lastName}`,
+          email: comment.user.email
+        },
+        book: {
+          id: comment.book.id,
+          title: comment.book.title
+        }
+      },
+      message: isApproved ? 'Duyệt bình luận thành công' : 'Từ chối bình luận thành công'
+    });
+  } catch (error) {
+    console.error('Error updating comment status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi cập nhật trạng thái bình luận',
+      error: error.message
+    });
+  }
+};
+
+// Delete comment (admin)
+const adminDeleteComment = async (req, res) => {
+  try {
+    const { commentId } = req.params;
+
+    const comment = await Comment.findByPk(commentId, {
+      include: [
+        {
+          model: User,
+          as: 'user',
+          attributes: ['id', 'firstName', 'lastName', 'email']
+        },
+        {
+          model: Book,
+          as: 'book',
+          attributes: ['id', 'title']
+        }
+      ]
+    });
+
+    if (!comment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Không tìm thấy bình luận'
+      });
+    }
+
+    await comment.destroy();
+
+    res.json({
+      success: true,
+      message: 'Xóa bình luận thành công'
+    });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi xóa bình luận',
+      error: error.message
+    });
+  }
+};
+
+// Get comment statistics for admin
+const getAdminCommentStats = async (req, res) => {
+  try {
+    const stats = await Comment.findAll({
+      attributes: [
+        [Comment.sequelize.fn('COUNT', Comment.sequelize.col('id')), 'totalComments'],
+        [Comment.sequelize.fn('COUNT', Comment.sequelize.literal('CASE WHEN is_approved = true THEN 1 END')), 'approvedComments'],
+        [Comment.sequelize.fn('COUNT', Comment.sequelize.literal('CASE WHEN is_approved = false THEN 1 END')), 'pendingComments'],
+        [Comment.sequelize.fn('SUM', Comment.sequelize.col('likes_count')), 'totalLikes']
+      ],
+      raw: true
+    });
+
+    const result = stats[0] || { 
+      totalComments: 0, 
+      approvedComments: 0, 
+      pendingComments: 0, 
+      totalLikes: 0 
+    };
+
+    // Get recent comments (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    const recentComments = await Comment.count({
+      where: {
+        createdAt: {
+          [Op.gte]: sevenDaysAgo
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        totalComments: parseInt(result.totalComments) || 0,
+        approvedComments: parseInt(result.approvedComments) || 0,
+        pendingComments: parseInt(result.pendingComments) || 0,
+        totalLikes: parseInt(result.totalLikes) || 0,
+        recentComments: recentComments
+      },
+      message: 'Lấy thống kê bình luận thành công'
+    });
+  } catch (error) {
+    console.error('Error getting admin comment stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Lỗi server khi lấy thống kê bình luận',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   getBookComments,
   createComment,
   updateComment,
   deleteComment,
   toggleCommentLike,
-  getCommentStats
+  getCommentStats,
+  // Admin functions
+  getAllComments,
+  updateCommentStatus,
+  adminDeleteComment,
+  getAdminCommentStats
 };

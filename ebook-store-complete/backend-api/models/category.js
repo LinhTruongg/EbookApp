@@ -102,6 +102,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     parentId: {
       type: DataTypes.INTEGER,
+      field: 'parent_id',
       references: {
         model: 'categories',
         key: 'id'
@@ -131,10 +132,12 @@ module.exports = (sequelize, DataTypes) => {
     },
     isActive: {
       type: DataTypes.BOOLEAN,
+      field: 'is_active',
       defaultValue: true
     },
     sortOrder: {
       type: DataTypes.INTEGER,
+      field: 'sort_order',
       defaultValue: 0,
       validate: {
         min: { args: 0, msg: 'Thứ tự sắp xếp không thể âm' }
@@ -142,6 +145,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     booksCount: {
       type: DataTypes.INTEGER,
+      field: 'books_count',
       defaultValue: 0,
       validate: {
         min: { args: 0, msg: 'Số lượng sách không thể âm' }
@@ -151,6 +155,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Category',
     tableName: 'categories',
+    underscored: true,
     indexes: [
       { fields: ['slug'], unique: true },
       { fields: ['parent_id'] },

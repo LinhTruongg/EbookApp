@@ -40,6 +40,9 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
       try {
         setLoading(true);
         const response = await apiService.getBooksByCategoryId(String(category.id));
+        console.log('Category books response:', response);
+        console.log('Response data:', response.data);
+        console.log('Books array:', response.data?.books);
         const serverBooks = (response.data?.books || []).map((b: any) => {
           const authorNames = Array.isArray(b.authors) && b.authors.length > 0 ? b.authors.map((a: any) => a.name).join(', ') : '';
           const hasDiscount = b.discountPrice && Number(b.discountPrice) < Number(b.price);
@@ -151,7 +154,6 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         numColumns={2}
-        columnWrapperStyle={styles.row}
       />
     </SafeAreaView>
   );

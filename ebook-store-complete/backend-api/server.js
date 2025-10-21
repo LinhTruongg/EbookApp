@@ -210,11 +210,11 @@ async function startServer() {
     await db.sequelize.authenticate();
     console.log('✅ Database connected successfully');
 
-    // Sync database (only in development)
-    if (process.env.NODE_ENV === 'development') {
-      await db.sequelize.sync({ alter: false });
-      console.log('✅ Database synchronized');
-    }
+    // Sync database (only in development) - temporarily disabled due to schema issues
+    // if (process.env.NODE_ENV === 'development') {
+    //   await db.sequelize.sync({ alter: false });
+    //   console.log('✅ Database synchronized');
+    // }
 
     // Start server on all interfaces for React Native development
     app.listen(PORT, '0.0.0.0', () => {

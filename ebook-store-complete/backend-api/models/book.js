@@ -153,6 +153,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     coverImage: {
       type: DataTypes.STRING(500),
+      field: 'cover_image',
       validate: {
         isUrl: { msg: 'URL ảnh bìa không hợp lệ' }
       }
@@ -167,6 +168,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     discountPrice: {
       type: DataTypes.DECIMAL(10, 2),
+      field: 'discount_price',
       validate: {
         min: { args: 0, msg: 'Giá giảm phải lớn hơn 0' },
         isDecimal: { msg: 'Giá giảm phải là số thập phân' },
@@ -180,6 +182,7 @@ module.exports = (sequelize, DataTypes) => {
     categoryId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'category_id',
       references: {
         model: 'categories',
         key: 'id'
@@ -199,12 +202,14 @@ module.exports = (sequelize, DataTypes) => {
     },
     publicationDate: {
       type: DataTypes.DATE,
+      field: 'publication_date',
       validate: {
         isDate: { msg: 'Ngày xuất bản không hợp lệ' }
       }
     },
     pageCount: {
       type: DataTypes.INTEGER,
+      field: 'page_count',
       validate: {
         min: { args: 1, msg: 'Số trang phải lớn hơn 0' },
         max: { args: 10000, msg: 'Số trang tối đa 10000' }
@@ -222,27 +227,32 @@ module.exports = (sequelize, DataTypes) => {
     },
     assetId: {
       type: DataTypes.STRING(500),
+      field: 'asset_id',
     },
     fileUrl: {
       type: DataTypes.STRING(500),
+      field: 'file_url',
       validate: {
         isUrl: { msg: 'URL file không hợp lệ' }
       }
     },
     fileSize: {
       type: DataTypes.BIGINT,
+      field: 'file_size',
       validate: {
         min: { args: 0, msg: 'Kích thước file không hợp lệ' }
       }
     },
     previewUrl: {
       type: DataTypes.STRING(500),
+      field: 'preview_url',
       validate: {
         isUrl: { msg: 'URL preview không hợp lệ' }
       }
     },
     samplePages: {
       type: DataTypes.INTEGER,
+      field: 'sample_pages',
       defaultValue: 10,
       validate: {
         min: { args: 1, msg: 'Số trang mẫu tối thiểu là 1' },
@@ -259,6 +269,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     totalReviews: {
       type: DataTypes.INTEGER,
+      field: 'total_reviews',
       defaultValue: 0,
       validate: {
         min: { args: 0, msg: 'Số đánh giá không thể âm' }
@@ -266,6 +277,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     totalPurchases: {
       type: DataTypes.INTEGER,
+      field: 'total_purchases',
       defaultValue: 0,
       validate: {
         min: { args: 0, msg: 'Số lượt mua không thể âm' }
@@ -273,6 +285,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     totalRevenue: {
       type: DataTypes.DECIMAL(12, 2),
+      field: 'total_revenue',
       defaultValue: 0.00,
       validate: {
         min: { args: 0, msg: 'Doanh thu không thể âm' }
@@ -284,14 +297,17 @@ module.exports = (sequelize, DataTypes) => {
     },
     isFeatured: {
       type: DataTypes.BOOLEAN,
+      field: 'is_featured',
       defaultValue: false
     },
     isBestseller: {
       type: DataTypes.BOOLEAN,
+      field: 'is_bestseller',
       defaultValue: false
     },
     isNewRelease: {
       type: DataTypes.BOOLEAN,
+      field: 'is_new_release',
       defaultValue: false
     },
     tags: {
@@ -306,6 +322,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'Book',
     tableName: 'books',
+    underscored: true,
     indexes: [
       { fields: ['category_id'] },
       { fields: ['price'] },

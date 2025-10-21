@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { apiService } from '../../../services/api';
 import { User } from '../../../types';
+import DateTimeField from '../../../components/common/DateTimeField';
 
 interface ManageUsersScreenProps {
   route?: {
@@ -455,12 +456,13 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Ngày sinh</Text>
-              <TextInput
-                style={styles.input}
+              <DateTimeField
+                label="Ngày sinh"
                 value={formData.dateOfBirth}
-                onChangeText={(text) => setFormData({ ...formData, dateOfBirth: text })}
-                placeholder="YYYY-MM-DD"
+                onChange={(iso) => setFormData({ ...formData, dateOfBirth: iso })}
+                mode="date"
+                maximumDate={new Date()}
+                placeholder="Chọn ngày sinh"
               />
             </View>
 

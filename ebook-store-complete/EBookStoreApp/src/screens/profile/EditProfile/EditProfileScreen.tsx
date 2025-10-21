@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
 import { User } from '../../../types';
+import DateTimeField from '../../../components/common/DateTimeField';
 
 export default function EditProfileScreen() {
   const { user, updateProfile } = useAuth();
@@ -136,7 +137,7 @@ export default function EditProfileScreen() {
               value={formData.firstName}
               onChangeText={(value) => handleInputChange('firstName', value)}
               placeholder="Nhập họ"
-              placeholderTextColor={COLORS.gray}
+              placeholderTextColor={COLORS.textPlaceholder}
             />
           </View>
 
@@ -147,7 +148,7 @@ export default function EditProfileScreen() {
               value={formData.lastName}
               onChangeText={(value) => handleInputChange('lastName', value)}
               placeholder="Nhập tên"
-              placeholderTextColor={COLORS.gray}
+              placeholderTextColor={COLORS.textPlaceholder}
             />
           </View>
 
@@ -158,19 +159,19 @@ export default function EditProfileScreen() {
               value={formData.phone}
               onChangeText={(value) => handleInputChange('phone', value)}
               placeholder="Nhập số điện thoại"
-              placeholderTextColor={COLORS.gray}
+              placeholderTextColor={COLORS.textPlaceholder}
               keyboardType="phone-pad"
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ngày sinh</Text>
-            <TextInput
-              style={styles.input}
-              value={formatDateForInput(formData.dateOfBirth)}
-              onChangeText={handleDateChange}
-              placeholder="YYYY-MM-DD"
-              placeholderTextColor={COLORS.gray}
+            <DateTimeField
+              label="Ngày sinh"
+              value={formData.dateOfBirth}
+              onChange={(iso) => handleInputChange('dateOfBirth', iso)}
+              mode="date"
+              maximumDate={new Date()}
+              placeholder="Chọn ngày sinh"
             />
           </View>
 
@@ -206,7 +207,7 @@ export default function EditProfileScreen() {
               value={formData.address}
               onChangeText={(value) => handleInputChange('address', value)}
               placeholder="Nhập địa chỉ"
-              placeholderTextColor={COLORS.gray}
+              placeholderTextColor={COLORS.textPlaceholder}
               multiline
               numberOfLines={3}
             />
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
   },
   input: {
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.border,
     borderRadius: 8,
     padding: 12,
     fontSize: SIZES.font.md,
@@ -290,7 +291,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.border,
     backgroundColor: COLORS.white,
     alignItems: 'center',
   },
@@ -327,7 +328,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.lightGray,
+    borderColor: COLORS.border,
   },
   cancelButtonText: {
     color: COLORS.text,

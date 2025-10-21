@@ -13,6 +13,7 @@ module.exports = (sequelize, DataTypes) => {
     bookId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'book_id',
       references: {
         model: 'books',
         key: 'id'
@@ -21,6 +22,7 @@ module.exports = (sequelize, DataTypes) => {
     authorId: {
       type: DataTypes.INTEGER,
       allowNull: false,
+      field: 'author_id',
       references: {
         model: 'authors',
         key: 'id'
@@ -41,6 +43,7 @@ module.exports = (sequelize, DataTypes) => {
     modelName: 'BookAuthor',
     tableName: 'book_authors',
     timestamps: false,
+    underscored: true,
     indexes: [
       {
         fields: ['book_id', 'author_id'],

@@ -54,7 +54,11 @@ const ManageCategoriesScreen: React.FC = () => {
       setLoading(true);
       const response = await apiService.getAllCategories();
       if (response.success) {
-        setCategories(response.data || []);
+        const normalized = (response.data || []).map((c: any) => ({
+          ...c,
+          id: String(c.id),
+        }));
+        setCategories(normalized);
       } else {
         Alert.alert('Lỗi', response.message || 'Không thể tải danh sách chủ đề');
       }
@@ -219,16 +223,18 @@ const ManageCategoriesScreen: React.FC = () => {
       </View>
       <View style={styles.categoryActions}>
         <TouchableOpacity
-          style={[styles.actionButton, styles.editButton]}
+          style={[styles.iconButton, styles.editButton]}
           onPress={() => openEditModal(item)}
+          accessibilityLabel="Sửa"
         >
-          <Text style={styles.actionButtonText}>Sửa</Text>
+          <Text style={styles.iconText}>✏️</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
+          style={[styles.iconButton, styles.deleteButton]}
           onPress={() => handleDelete(item)}
+          accessibilityLabel="Xóa"
         >
-          <Text style={styles.actionButtonText}>Xóa</Text>
+          <Text style={styles.iconText}>🗑️</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -248,7 +254,6 @@ const ManageCategoriesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Quản lý chủ đề</Text>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Text style={styles.addButtonText}>+ Thêm chủ đề</Text>
         </TouchableOpacity>
@@ -491,10 +496,12 @@ const styles = StyleSheet.create({
   categoryActions: {
     flexDirection: 'row',
   },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
+  iconButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginLeft: 8,
   },
   editButton: {
@@ -503,10 +510,10 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#dc3545',
   },
-  actionButtonText: {
+  iconText: {
     color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
   },
   emptyContainer: {
     flex: 1,

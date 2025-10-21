@@ -122,6 +122,15 @@ router.get('/:id', getBookByIdValidation, optionalAuth, bookController.getBookBy
 
 /**
  * @swagger
+ * /api/books/{id}/suggested:
+ *   get:
+ *     tags: [Books]
+ *     summary: Get suggested books based on category
+ */
+router.get('/:id/suggested', optionalAuth, bookController.getSuggestedBooks);
+
+/**
+ * @swagger
  * /api/books/{id}/wishlist:
  *   post:
  *     tags: [Books]

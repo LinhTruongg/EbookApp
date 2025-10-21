@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,31 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
-import { Book } from '../../../types';
+import { Book, Comment, CommentsResponse } from '../../../types';
+import { apiService } from '../../../services/api';
+import { eventBus } from '../../../utils/eventBus';
 
 const { width: screenWidth } = Dimensions.get('window');
 
 interface BookDetailScreenProps {
   book: Book;
+  initialInWishlist?: boolean;
 }
 
-const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book }) => {
+const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWishlist = false }) => {
   const router = useRouter();
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState<boolean>(false);
+  const [newComment, setNewComment] = useState<string>('');
+  const [posting, setPosting] = useState<boolean>(false);
+  const [inWishlist, setInWishlist] = useState<boolean>(initialInWishlist);
+  const [suggestedBooks, setSuggestedBooks] = useState<Book[]>([]);
+  const [suggestedLoading, setSuggestedLoading] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
   const finalPrice = book.discountPrice || book.price;
@@ -36,7 +48,87 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book }) => {
   };
 
   const handleGoBack = () => {
-    router.back();
+    const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
+    if (canGoBack) {
+      router.back();
+    } else {
+      router.replace('/');
+    }
+  };
+
+  const loadComments = async () => {
+    try {
+      setCommentsLoading(true);
+      const res = await apiService.getBookComments(book.id, 1, 20);
+      if (res.success && res.data) {
+        setComments(res.data.comments);
+      }
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const loadSuggestedBooks = async () => {
+    try {
+      setSuggestedLoading(true);
+      const res = await apiService.getSuggestedBooks(book.id, 6);
+      if (res.success && res.data) {
+        setSuggestedBooks(res.data);
+      }
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setSuggestedLoading(false);
+    }
+  };
+
+  const handlePostComment = async () => {
+    const content = newComment.trim();
+    if (!content) return;
+    try {
+      setPosting(true);
+      const res = await apiService.createComment(book.id, { content });
+      if (res.success && res.data) {
+        setNewComment('');
+        // Prepend new comment
+        setComments(prev => [res.data as unknown as Comment, ...prev]);
+      }
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setPosting(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    try {
+      const res = await apiService.likeComment(commentId);
+      if (res.success && res.data) {
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, hasLiked: res.data.hasLiked, likesCount: res.data.likesCount } : c));
+      }
+    } catch (e) {
+      // ignore for now
+    }
+  };
+
+  useEffect(() => {
+    loadComments();
+    loadSuggestedBooks();
+  }, [book.id]);
+
+  const toggleWishlist = async () => {
+    try {
+      const res = await apiService.toggleWishlist(book.id);
+      if (res.success && res.data) {
+        const next = (res.data as any).inWishlist;
+        setInWishlist(next);
+        eventBus.emit('wishlist:toggle', { book, inWishlist: next });
+      }
+    } catch (e) {
+      // ignore for now
+    }
   };
 
   return (
@@ -49,8 +141,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book }) => {
           <Text style={styles.backButtonText}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi tiết sách</Text>
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Text style={styles.favoriteButtonText}>♡</Text>
+        <TouchableOpacity style={styles.favoriteButton} onPress={toggleWishlist} accessibilityLabel="Yêu thích">
+          <Text style={[styles.favoriteButtonText, inWishlist && styles.favorited]}>{inWishlist ? '❤️' : '♡'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -148,6 +240,100 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book }) => {
             </View>
           )}
         </View>
+
+      {/* Comments */}
+      <View style={styles.commentsSection}>
+        <Text style={styles.sectionTitle}>Bình luận</Text>
+
+        <View style={styles.commentInputRow}>
+          <TextInput
+            style={styles.commentInput}
+            placeholder="Viết bình luận..."
+            value={newComment}
+            onChangeText={setNewComment}
+            multiline
+          />
+          <TouchableOpacity style={[styles.sendButton, posting && styles.sendButtonDisabled]} onPress={handlePostComment} disabled={posting}>
+            <Text style={styles.sendButtonText}>{posting ? '...' : 'Gửi'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {commentsLoading ? (
+          <View style={styles.commentsLoading}>
+            <ActivityIndicator color={COLORS.primary} />
+            <Text style={styles.loadingText}>Đang tải bình luận...</Text>
+          </View>
+        ) : (
+          <View>
+            {comments.length === 0 ? (
+              <Text style={styles.emptyComments}>Chưa có bình luận nào</Text>
+            ) : (
+              comments.map((c) => (
+                <View key={c.id} style={styles.commentItem}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{c.user?.name || 'Người dùng'}</Text>
+                    <Text style={styles.commentTime}>{c.timeAgo || ''}</Text>
+                  </View>
+                  <Text style={styles.commentContent}>{c.content}</Text>
+                  <View style={styles.commentActions}>
+                    <TouchableOpacity style={styles.likeButton} onPress={() => handleLikeComment(c.id)}>
+                      <Text style={[styles.likeText, c.hasLiked && styles.liked]}>❤️ {c.likesCount}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))
+            )}
+          </View>
+        )}
+      </View>
+
+      {/* Suggested Books */}
+      {suggestedBooks.length > 0 && (
+        <View style={styles.suggestedSection}>
+          <Text style={styles.sectionTitle}>Sách cùng chủ đề</Text>
+          {suggestedLoading ? (
+            <View style={styles.suggestedLoading}>
+              <ActivityIndicator color={COLORS.primary} />
+              <Text style={styles.loadingText}>Đang tải sách gợi ý...</Text>
+            </View>
+          ) : (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.suggestedScroll}
+            >
+              {suggestedBooks.map((suggestedBook) => (
+                <TouchableOpacity 
+                  key={suggestedBook.id} 
+                  style={styles.suggestedItem}
+                  onPress={() => router.push(`/book-detail/${suggestedBook.id}`)}
+                >
+                  <Image 
+                    source={{ 
+                      uri: suggestedBook.coverImage || 'https://via.placeholder.com/120x160/CCCCCC/FFFFFF?text=No+Image' 
+                    }} 
+                    style={styles.suggestedCover} 
+                  />
+                  <Text style={styles.suggestedTitle} numberOfLines={2}>
+                    {suggestedBook.title}
+                  </Text>
+                  <Text style={styles.suggestedAuthor} numberOfLines={1}>
+                    {suggestedBook.authors?.map(author => author.name).join(', ') || 'Unknown Author'}
+                  </Text>
+                  <Text style={styles.suggestedPrice}>
+                    {suggestedBook.discountPrice 
+                      ? `${suggestedBook.discountPrice.toLocaleString('vi-VN')}đ`
+                      : suggestedBook.price 
+                        ? `${suggestedBook.price.toLocaleString('vi-VN')}đ`
+                        : 'Miễn phí'
+                    }
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
       </ScrollView>
 
       {/* Action Buttons */}
@@ -205,6 +391,9 @@ const styles = StyleSheet.create({
   favoriteButtonText: {
     fontSize: 20,
     color: COLORS.primary,
+  },
+  favorited: {
+    color: '#e11d48',
   },
   content: {
     flex: 1,
@@ -335,6 +524,87 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     fontWeight: '500',
   },
+  commentsSection: {
+    padding: SIZES.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: SIZES.spacing.md,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    gap: SIZES.spacing.sm,
+  },
+  commentInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: SIZES.borderRadius.lg,
+    paddingHorizontal: SIZES.spacing.md,
+    paddingVertical: SIZES.spacing.sm,
+    minHeight: 44,
+    backgroundColor: COLORS.surface,
+  },
+  sendButton: {
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: SIZES.spacing.md,
+    borderRadius: SIZES.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.6,
+  },
+  sendButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  commentsLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.spacing.sm,
+  },
+  loadingText: {
+    color: COLORS.textSecondary,
+  },
+  emptyComments: {
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
+  },
+  commentItem: {
+    paddingVertical: SIZES.spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.surface,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  commentAuthor: {
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  commentTime: {
+    color: COLORS.textSecondary,
+    fontSize: SIZES.font.sm,
+  },
+  commentContent: {
+    color: COLORS.text,
+    marginTop: 2,
+  },
+  commentActions: {
+    marginTop: 6,
+  },
+  likeButton: {
+    alignSelf: 'flex-start',
+  },
+  likeText: {
+    color: COLORS.textSecondary,
+  },
+  liked: {
+    color: '#e11d48',
+    fontWeight: '700',
+  },
   actionButtons: {
     flexDirection: 'row',
     padding: SIZES.spacing.lg,
@@ -367,6 +637,47 @@ const styles = StyleSheet.create({
     fontSize: SIZES.font.md,
     fontWeight: '600',
     color: COLORS.white,
+  },
+  suggestedSection: {
+    padding: SIZES.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  suggestedLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.spacing.sm,
+  },
+  suggestedScroll: {
+    paddingRight: SIZES.spacing.lg,
+  },
+  suggestedItem: {
+    width: 120,
+    marginRight: SIZES.spacing.md,
+  },
+  suggestedCover: {
+    width: 120,
+    height: 160,
+    borderRadius: SIZES.borderRadius.md,
+    backgroundColor: COLORS.surface,
+    marginBottom: SIZES.spacing.sm,
+  },
+  suggestedTitle: {
+    fontSize: SIZES.font.sm,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 2,
+    lineHeight: 16,
+  },
+  suggestedAuthor: {
+    fontSize: SIZES.font.xs,
+    color: COLORS.textSecondary,
+    marginBottom: SIZES.spacing.xs,
+  },
+  suggestedPrice: {
+    fontSize: SIZES.font.sm,
+    fontWeight: '600',
+    color: COLORS.primary,
   },
 });
 

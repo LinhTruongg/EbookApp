@@ -88,6 +88,7 @@ module.exports = (sequelize, DataTypes) => {
   User.init({
     firstName: {
       type: DataTypes.STRING(50),
+      field: 'first_name',
       allowNull: false,
       validate: {
         notEmpty: { msg: 'Tên không được để trống' },
@@ -99,6 +100,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     lastName: {
       type: DataTypes.STRING(50),
+      field: 'last_name',
       allowNull: false,
       validate: {
         notEmpty: { msg: 'Họ không được để trống' },
@@ -145,7 +147,8 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     dateOfBirth: {
-      type: DataTypes.DATE,
+      type: DataTypes.DATEONLY,
+      field: 'date_of_birth',
       validate: {
         isDate: { msg: 'Ngày sinh không hợp lệ' },
         isBefore: {
@@ -176,18 +179,21 @@ module.exports = (sequelize, DataTypes) => {
     },
     isVerified: {
       type: DataTypes.BOOLEAN,
+      field: 'is_verified',
       defaultValue: false
     },
-    verificationToken: DataTypes.STRING,
-    resetPasswordToken: DataTypes.STRING,
-    resetPasswordExpires: DataTypes.DATE,
-    lastLogin: DataTypes.DATE,
+    verificationToken: { type: DataTypes.STRING, field: 'verification_token' },
+    resetPasswordToken: { type: DataTypes.STRING, field: 'reset_password_token' },
+    resetPasswordExpires: { type: DataTypes.DATE, field: 'reset_password_expires' },
+    lastLogin: { type: DataTypes.DATE, field: 'last_login' },
     isActive: {
       type: DataTypes.BOOLEAN,
+      field: 'is_active',
       defaultValue: true
     },
     readingPreferences: {
       type: DataTypes.JSON,
+      field: 'reading_preferences',
       defaultValue: {
         theme: 'light',
         fontSize: 16,
@@ -197,15 +203,18 @@ module.exports = (sequelize, DataTypes) => {
     },
     favoriteCategories: {
       type: DataTypes.JSON,
+      field: 'favorite_categories',
       defaultValue: []
     },
     totalSpent: {
       type: DataTypes.DECIMAL(12, 2),
+      field: 'total_spent',
       defaultValue: 0.00,
       allowNull: false
     },
     booksPurchased: {
       type: DataTypes.INTEGER,
+      field: 'books_purchased',
       defaultValue: 0,
       allowNull: false
     }
@@ -213,6 +222,7 @@ module.exports = (sequelize, DataTypes) => {
     sequelize,
     modelName: 'User',
     tableName: 'users',
+    underscored: true,
     hooks: {
       beforeCreate: async (user) => {
         if (user.password) {
