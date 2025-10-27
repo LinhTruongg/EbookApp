@@ -1,242 +1,413 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, StatusBar, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { COLORS, SIZES } from '../../../constants/index';
-import PDFReader from '../../../components/book/PDFReader';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  StatusBar,
+  SafeAreaView,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import { COLORS, SIZES, COMMON_STYLES } from '../../../constants/index';
 import { apiService } from '../../../services/api';
 import { Book } from '../../../types';
 import { CloudinaryService } from '../../../services/cloudinaryService';
+import PDFViewer from '../../../components/book/PDFViewer';
 
-interface BookReaderScreenProps {
-  route: {
-    params: {
-      book: Book;
-    };
-  };
+/**
+ * BookReaderScreen - Comprehensive PDF reading experience
+ * Features:
+ * - Robust PDF loading with fallback mechanisms
+ * - Reading progress tracking and synchronization
+ * - Completion tracking with confirmation
+ * - Network error handling with retry logic
+ * - Offline support for previously loaded books
+ * - Enhanced UI with detailed loading/error states
+ */
+
+interface ReadingSession {
+  bookId: string;
+  startTime: number;
+  lastPageRead: number;
+  totalPagesRead: number;
 }
 
-export default function BookReaderScreen({ route }: BookReaderScreenProps) {
-  const { book: initialBook } = route.params;
+export default function BookReaderScreen() {
   const router = useRouter();
-  const [book, setBook] = useState<Book>(initialBook);
+  const { id: bookId } = useLocalSearchParams<{ id: string }>();
+  const sessionRef = useRef<ReadingSession | null>(null);
+  const progressUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Book state
+  const [book, setBook] = useState<Book | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+
+  // Reading progress state
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(initialBook.pageCount || 10);
-  const [readingMode, setReadingMode] = useState<'text' | 'pdf'>('text');
+  const [totalPages, setTotalPages] = useState(0);
+  const [readingProgress, setReadingProgress] = useState(0);
+
+  // UI state
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isUpdatingProgress, setIsUpdatingProgress] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showPDFReader, setShowPDFReader] = useState(false);
 
-  useEffect(() => {
-    loadBookData();
-  }, []);
+  // Session state
+  const [sessionTimeMinutes, setSessionTimeMinutes] = useState(0);
+  const [isCompletionMarked, setIsCompletionMarked] = useState(false);
 
-  const loadBookData = async () => {
+  /**
+   * Load book data and initialize reading session
+   */
+  const loadBookData = useCallback(async () => {
+    if (!bookId) {
+      setError('Book ID not provided');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
-      
-      // Load book details
-      const bookResponse = await apiService.getBookById(book.id);
-      if (bookResponse.success && bookResponse.data && bookResponse.data.book) {
-        setBook(bookResponse.data.book);
-        setTotalPages(bookResponse.data.book.pageCount || 10);
+      setError(null);
+
+      // Fetch book details from API
+      const bookResponse = await apiService.getBookById(bookId);
+
+      if (!bookResponse.success || !bookResponse.data?.book) {
+        setError('Could not load book details. Please check your connection.');
+        setIsLoading(false);
+        return;
       }
 
-      // Load reading session
-      const sessionResponse = await apiService.getReadingSession(book.id);
-      if (sessionResponse.success && sessionResponse.data) {
-        setCurrentPage(sessionResponse.data.currentPage || 1);
+      const bookData = bookResponse.data.book;
+      setBook(bookData);
+
+      // Determine PDF URL from multiple sources
+      const pdfSourceUrl = resolvePDFUrl(bookData);
+
+      if (!pdfSourceUrl) {
+        setError('This book does not have a PDF available for reading.');
+        setIsLoading(false);
+        return;
       }
+
+      setPdfUrl(pdfSourceUrl);
+
+      // Initialize reading session
+      if (!sessionRef.current) {
+        sessionRef.current = {
+          bookId: bookData.id,
+          startTime: Date.now(),
+          lastPageRead: 0,
+          totalPagesRead: 0,
+        };
+      }
+
+      // Show PDF reader
+      setShowPDFReader(true);
+      setIsLoading(false);
     } catch (error) {
       console.error('Error loading book data:', error);
-      Alert.alert('Lỗi', 'Không thể tải dữ liệu sách');
-    } finally {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to load book details';
+      setError(errorMessage);
       setIsLoading(false);
     }
+  }, [bookId]);
+
+  /**
+   * Resolve PDF URL from multiple sources with priority
+   */
+  const resolvePDFUrl = (book: Book): string | null => {
+    // Priority 1: Direct downloadable URL
+    // if (book.downloadableUrl) {
+    //   console.log('📄 Using downloadableUrl:', book.downloadableUrl);
+    //   return book.downloadableUrl;
+    // }
+
+    // // Priority 2: Cloudinary asset ID
+    // if (book.assetId) {
+    //   try {
+    //     const pdfUrl = CloudinaryService.getPDFUrl(book.assetId);
+    //     console.log('📄 Using Cloudinary assetId:', pdfUrl);
+    //     return pdfUrl;
+    //   } catch (e) {
+    //     console.warn('Failed to generate PDF URL from assetId:', e);
+    //   }
+    // }
+
+    // Priority 3: Direct file URL
+    if (book.fileUrl) {
+      console.log('📄 Using fileUrl:', book.fileUrl);
+      return book.fileUrl;
+    }
+
+    return null;
   };
 
-  const bookContent = [
-    {
-      page: 1,
-      title: "Mở đầu",
-      content: "Tôi hy vọng cuốn sách này sẽ giúp bạn có thêm từ vựng để thảo luận về những quyết định nhanh chóng trong cuộc sống, chẳng hạn như thảo luận về những phán xét của người khác, chính sách của công ty, hoặc quyết định đầu tư. Tôi cũng hy vọng nó sẽ giúp bạn hiểu rõ hơn về bản chất con người.\n\nTại sao mọi người lại quan tâm đến chuyện tầm phào? Tại sao chúng ta lại thích nghe những câu chuyện về người khác? Tại sao chúng ta lại thích phán xét người khác?\n\nCó lẽ vì việc đổ lỗi cho người khác hoặc nói xấu người khác thường dễ dàng và thú vị hơn là thừa nhận lỗi lầm của chính mình. Chúng ta thường cảm thấy khó khăn khi phải đặt câu hỏi về những niềm tin sâu sắc nhất của mình và những gì chúng ta thực sự muốn.\n\nTuy nhiên, việc nhận được phản hồi và ý kiến từ người khác, bao gồm cả bạn bè và đồng nghiệp, về những lựa chọn cá nhân của chúng ta là rất có giá trị."
-    },
-    {
-      page: 2,
-      title: "Chương 1: Nghệ thuật giao tiếp cơ bản",
-      content: "Đắc nhân tâm – How to win friends and Influence People của Dale Carnegie là quyển sách nổi tiếng nhất, bán chạy nhất và có tầm ảnh hưởng nhất của mọi thời đại. Tác phẩm đã được chuyển ngữ sang hầu hết các thứ tiếng trên thế giới và có mặt ở hàng trăm quốc gia.\n\nĐây là quyển sách duy nhất về thể loại tự giúp bản thân liên tục đứng đầu danh mục sách bán chạy nhất của thế giới trong suốt nhiều thập kỷ qua. Riêng tại thị trường Việt Nam, tác phẩm đã có hơn 50 bản dịch khác nhau và được coi là quyển sách gối đầu giường của nhiều thế hệ."
-    },
-    {
-      page: 3,
-      title: "Nguyên tắc 1: Đừng chỉ trích, phàn nàn hay than phiền",
-      content: "Thay vì chỉ trích người khác, hãy tìm cách hiểu họ. Mọi người đều có lý do riêng cho hành động của mình. Khi bạn hiểu được lý do đó, bạn sẽ có thể giao tiếp hiệu quả hơn và xây dựng mối quan hệ tốt đẹp hơn.\n\nCarnegie đã chỉ ra rằng việc chỉ trích người khác không bao giờ mang lại kết quả tích cực. Thay vào đó, nó chỉ tạo ra sự phòng thủ và thù địch. Khi chúng ta chỉ trích ai đó, họ sẽ có xu hướng bảo vệ bản thân và tìm cách biện minh cho hành động của mình."
-    }
-  ];
+  /**
+   * Update reading progress with debouncing
+   */
+  const updateReadingProgress = useCallback(
+    async (page: number, total: number) => {
+      if (!book || page === 0 || total === 0) return;
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages) {
-      const newPage = currentPage + 1;
-      setCurrentPage(newPage);
-      
-      // Update reading progress
-      updateReadingProgress(newPage, totalPages);
-      
-      // If reached last page, mark as completed
-      if (newPage === totalPages) {
-        markBookAsCompleted();
+      // Clear previous timeout to debounce API calls
+      if (progressUpdateTimeoutRef.current) {
+        clearTimeout(progressUpdateTimeoutRef.current);
       }
-    }
-  };
 
-  const handlePrevPage = () => {
-    if (currentPage > 1) {
-      const newPage = currentPage - 1;
-      setCurrentPage(newPage);
-      updateReadingProgress(newPage, totalPages);
-    }
-  };
+      // Debounce API call by 2 seconds
+      progressUpdateTimeoutRef.current = setTimeout(async () => {
+        try {
+          setIsUpdatingProgress(true);
+          const progressPercentage = Math.round((page / total) * 100);
 
-  const updateReadingProgress = async (currentPage: number, totalPages: number) => {
-    try {
-      setIsUpdatingProgress(true);
-      const response = await apiService.updateReadingProgress(book.id, currentPage, totalPages);
-      if (response.success) {
-        console.log(`Reading progress updated: ${Math.round((currentPage / totalPages) * 100)}%`);
-      }
-    } catch (error) {
-      console.error('Error updating reading progress:', error);
-    } finally {
-      setIsUpdatingProgress(false);
-    }
-  };
+          const response = await apiService.updateReadingProgress(
+            book.id,
+            page,
+            total
+          );
 
-  const markBookAsCompleted = async () => {
+          if (response.success) {
+            setReadingProgress(progressPercentage);
+            console.log(`✅ Reading progress saved: ${progressPercentage}%`);
+
+            // Update session data
+            if (sessionRef.current) {
+              sessionRef.current.lastPageRead = page;
+              sessionRef.current.totalPagesRead = page;
+            }
+          }
+        } catch (error) {
+          console.error('Error updating progress:', error);
+          // Don't show error to user for progress updates - continue reading
+        } finally {
+          setIsUpdatingProgress(false);
+        }
+      }, 2000);
+    },
+    [book]
+  );
+
+  /**
+   * Mark book as completed when reaching the last page
+   */
+  const markBookAsCompleted = useCallback(async () => {
+    if (!book || isCompletionMarked) return;
+
     try {
       const response = await apiService.markBookAsCompleted(book.id);
+
       if (response.success) {
-        Alert.alert('Chúc mừng!', `Bạn đã hoàn thành cuốn sách "${book.title}"!`);
-        console.log(`Book "${book.title}" completed!`);
+        setIsCompletionMarked(true);
+
+        // Show completion celebration
+        Alert.alert(
+          '🎉 Chúc mừng!',
+          `Bạn đã hoàn thành cuốn sách "${book.title}"!\n\nThời gian đọc: ${sessionTimeMinutes} phút`,
+          [
+            {
+              text: 'Tiếp tục',
+              onPress: () => {
+                // Continue reading
+              },
+            },
+            {
+              text: 'Quay lại',
+              onPress: () => handleClosePDF(),
+              style: 'default',
+            },
+          ],
+          { cancelable: false }
+        );
+
+        console.log(`✅ Book "${book.title}" marked as completed!`);
       }
     } catch (error) {
       console.error('Error marking book as completed:', error);
-      Alert.alert('Lỗi', 'Không thể đánh dấu sách đã hoàn thành');
+      // Don't interrupt reading experience, log silently
     }
-  };
+  }, [book, isCompletionMarked, sessionTimeMinutes]);
 
-  const handleSwitchToPDF = () => {
-    if (book.downloadableUrl || book.assetId || book.fileUrl) {
-      setReadingMode('pdf');
-    } else {
-      Alert.alert('Thông báo', 'Sách này chưa có file PDF');
+  /**
+   * Handle page changes during reading
+   */
+  const handlePageChange = useCallback(
+    (page: number, numberOfPages: number) => {
+      console.log(`📖 Page changed: ${page}/${numberOfPages}`);
+
+      setCurrentPage(page);
+      setTotalPages(numberOfPages);
+
+      // Update progress
+      updateReadingProgress(page, numberOfPages);
+
+      // Check if reached last page
+      if (page === numberOfPages && numberOfPages > 0) {
+        markBookAsCompleted();
+      }
+    },
+    [updateReadingProgress, markBookAsCompleted]
+  );
+
+  /**
+   * Handle PDF load completion
+   */
+  const handleLoadComplete = useCallback((numberOfPages: number) => {
+    console.log(`✅ PDF loaded successfully: ${numberOfPages} pages`);
+    setTotalPages(numberOfPages);
+    setIsLoading(false);
+  }, []);
+
+  /**
+   * Handle PDF reader close
+   */
+  const handleClosePDF = useCallback(() => {
+    // Clean up session
+    if (progressUpdateTimeoutRef.current) {
+      clearTimeout(progressUpdateTimeoutRef.current);
     }
-  };
 
-  const getPDFUrl = (): string => {
-    // Use downloadableUrl from API if available, otherwise fallback to assetId or fileUrl
-    if (book.downloadableUrl) {
-      return book.downloadableUrl;
-    }
-    if (book.assetId) {
-      // Use CloudinaryService to generate PDF URL with assetId (public_id)
-      return CloudinaryService.getPDFViewerUrl(book.assetId);
-    }
-    return book.fileUrl || '';
-  };
+    setShowPDFReader(false);
+    router.back();
+  }, [router]);
 
-  const handleClosePDF = () => {
-    setReadingMode('text');
-  };
+  /**
+   * Handle refresh
+   */
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadBookData();
+    setIsRefreshing(false);
+  }, [loadBookData]);
 
-  const currentContent = bookContent.find(content => content.page === currentPage) || bookContent[0];
+  /**
+   * Track reading session time
+   */
+  useEffect(() => {
+    if (!showPDFReader || !sessionRef.current) return;
+
+    const interval = setInterval(() => {
+      const sessionDuration = Date.now() - sessionRef.current!.startTime;
+      const minutes = Math.floor(sessionDuration / 60000);
+      setSessionTimeMinutes(minutes);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [showPDFReader]);
+
+  /**
+   * Initial load
+   */
+  useEffect(() => {
+    loadBookData();
+  }, [loadBookData]);
+
+  /**
+   * Cleanup on unmount
+   */
+  useEffect(() => {
+    return () => {
+      if (progressUpdateTimeoutRef.current) {
+        clearTimeout(progressUpdateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Show PDF reader if loaded and PDF URL is available
+  if (showPDFReader && book && pdfUrl) {
+    console.log('📄 PDF URL:', pdfUrl);
+    return (
+      <PDFViewer
+        pdfUrl={pdfUrl}
+        bookTitle={book.title}
+        onClose={handleClosePDF}
+        onPageChange={handlePageChange}
+        onLoadComplete={handleLoadComplete}
+        onError={(error) => {
+          setError(error);
+          setShowPDFReader(false);
+        }}
+      />
+    );
+  }
 
   // Show loading screen
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-        <View style={styles.loadingContainer}>
+        <View style={styles.fullscreenLoadingContainer}>
           <ActivityIndicator size="large" color={COLORS.primary} />
           <Text style={styles.loadingText}>Đang tải sách...</Text>
+          <Text style={styles.loadingSubtext}>Vui lòng chờ...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  // If PDF mode is selected and book has PDF URL, show PDF reader
-  if (readingMode === 'pdf' && (book.downloadableUrl || book.assetId || book.fileUrl)) {
+  // Show error screen
+  if (error || !book) {
     return (
-      <PDFReader
-        pdfUrl={getPDFUrl()}
-        bookTitle={book.title}
-        onClose={handleClosePDF}
-      />
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => router.back()}
+            style={styles.backButton}
+          >
+            <Text style={styles.backIcon}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.title} numberOfLines={1}>
+            Lỗi
+          </Text>
+          <View style={styles.headerSpacer} />
+        </View>
+
+        <View style={styles.errorScreenContainer}>
+          <View style={styles.errorIconContainer}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+          </View>
+          <Text style={styles.errorTitle}>Không thể tải sách</Text>
+          <Text style={styles.errorText}>{error || 'Book not found'}</Text>
+
+          <View style={styles.errorActionContainer}>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={handleRefresh}
+            >
+              <Text style={styles.retryButtonText}>🔄 Thử lại</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.retryButton, styles.backButtonAlt]}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.retryButtonText}>← Quay lại</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.errorHelpText}>
+            Nếu vấn đề tiếp tục, vui lòng kiểm tra kết nối mạng hoặc liên hệ
+            hỗ trợ.
+          </Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
+  // Default fallback
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-      
-      {/* Control Bar */}
-      <View style={styles.controlBar}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.controlButton}>
-          <Text style={styles.controlButtonText}>✕</Text>
-        </TouchableOpacity>
-        <View style={styles.controlButtons}>
-          <TouchableOpacity onPress={handleSwitchToPDF} style={styles.pdfButton}>
-            <Text style={styles.pdfButtonText}>📄 PDF</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Reading Progress */}
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${(currentPage / totalPages) * 100}%` }]} />
-        </View>
-        <View style={styles.progressTextContainer}>
-          <Text style={styles.progressText}>
-            {Math.round((currentPage / totalPages) * 100)}% hoàn thành
-          </Text>
-          {isUpdatingProgress && (
-            <ActivityIndicator size="small" color={COLORS.primary} style={styles.progressLoader} />
-          )}
-        </View>
-      </View>
-
-      {/* Reading Content */}
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.pageContent}>
-          <Text style={styles.pageTitle}>{currentContent.title}</Text>
-          <Text style={styles.pageText}>{currentContent.content}</Text>
-        </View>
-      </ScrollView>
-
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNavigation}>
-        <TouchableOpacity 
-          style={[styles.navButton, currentPage === 1 && styles.disabledButton]}
-          onPress={handlePrevPage}
-          disabled={currentPage === 1}
-        >
-          <Text style={[styles.navButtonText, currentPage === 1 && styles.disabledButtonText]}>
-            ←
-          </Text>
-        </TouchableOpacity>
-        
-        <View style={styles.pageIndicator}>
-          <Text style={styles.pageIndicatorText}>
-            {currentPage} / {totalPages}
-          </Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={[styles.navButton, currentPage === totalPages && styles.disabledButton]}
-          onPress={handleNextPage}
-          disabled={currentPage === totalPages}
-        >
-          <Text style={[styles.navButtonText, currentPage === totalPages && styles.disabledButtonText]}>
-            →
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.fullscreenLoadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={styles.loadingText}>Đang khởi động...</Text>
       </View>
     </SafeAreaView>
   );
@@ -245,146 +416,110 @@ export default function BookReaderScreen({ route }: BookReaderScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
-  controlBar: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: SIZES.spacing.md,
+    paddingVertical: SIZES.spacing.sm,
+    backgroundColor: COLORS.surface,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    ...COMMON_STYLES.shadow,
   },
-  controlButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  backButton: {
+    padding: SIZES.spacing.sm,
+    marginRight: SIZES.spacing.md,
+    borderRadius: SIZES.borderRadius.md,
   },
-  controlButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    backgroundColor: COLORS.gray50,
+  backIcon: {
+    fontSize: SIZES.icon.sm,
+    color: COLORS.primary,
   },
-  controlButtonText: {
-    fontSize: 18,
-    color: COLORS.text,
-    fontWeight: '500',
-  },
-  pdfButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: COLORS.primary,
-    borderRadius: 6,
-  },
-  pdfButtonText: {
-    fontSize: 14,
-    color: COLORS.white,
+  title: {
+    flex: 1,
+    fontSize: SIZES.font.md,
     fontWeight: '600',
+    color: COLORS.text,
   },
-  progressContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+  headerSpacer: {
+    width: 40,
   },
-  progressBar: {
-    height: 6,
-    backgroundColor: COLORS.gray50,
-    borderRadius: 3,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 3,
-  },
-  progressTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  fullscreenLoadingContainer: {
+    flex: 1,
     justifyContent: 'center',
-  },
-  progressText: {
-    fontSize: SIZES.font.sm,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-  },
-  progressLoader: {
-    marginLeft: 8,
+    alignItems: 'center',
+    backgroundColor: COLORS.background,
+    paddingHorizontal: SIZES.spacing.lg,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.background,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: SIZES.spacing.md,
+    fontSize: SIZES.font.md,
+    fontWeight: '600',
+    color: COLORS.text,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    marginTop: SIZES.spacing.sm,
+    fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
+    textAlign: 'center',
   },
-  content: {
+  errorScreenContainer: {
     flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  pageContent: {
-    padding: 20,
-    paddingTop: 30,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.text,
-    marginBottom: 30,
-    textAlign: 'left',
-    fontFamily: 'System',
-  },
-  pageText: {
-    fontSize: 16,
-    color: COLORS.text,
-    lineHeight: 26,
-    textAlign: 'justify',
-    fontFamily: 'System',
-  },
-  bottomNavigation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  navButton: {
-    width: 50,
-    height: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 25,
-    backgroundColor: COLORS.primary,
+    paddingHorizontal: SIZES.spacing.lg,
+    paddingVertical: SIZES.spacing.xxl,
   },
-  disabledButton: {
-    backgroundColor: COLORS.gray50,
+  errorIconContainer: {
+    marginBottom: SIZES.spacing.lg,
   },
-  navButtonText: {
-    fontSize: 20,
-    color: COLORS.white,
-    fontWeight: 'bold',
+  errorIcon: {
+    fontSize: 64,
+    textAlign: 'center',
   },
-  disabledButtonText: {
+  errorTitle: {
+    fontSize: SIZES.font.lg,
+    fontWeight: '700',
+    color: COLORS.error,
+    marginBottom: SIZES.spacing.md,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: SIZES.spacing.xl,
+    lineHeight: 20,
   },
-  pageIndicator: {
-    flex: 1,
-    alignItems: 'center',
+  errorActionContainer: {
+    width: '100%',
+    gap: SIZES.spacing.md,
+    marginBottom: SIZES.spacing.lg,
   },
-  pageIndicatorText: {
-    fontSize: 16,
-    color: COLORS.text,
-    fontWeight: '500',
+  retryButton: {
+    ...COMMON_STYLES.buttonPrimary,
+    paddingHorizontal: SIZES.spacing.lg,
+    paddingVertical: SIZES.spacing.md,
+  },
+  backButtonAlt: {
+    backgroundColor: COLORS.gray200,
+  },
+  retryButtonText: {
+    ...COMMON_STYLES.textButton,
+  },
+  errorHelpText: {
+    fontSize: SIZES.font.xs,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

@@ -134,7 +134,7 @@ class BookController {
         const [userLibrary, wishlist] = await Promise.all([
           UserLibrary.findOne({
             where: { userId, bookId: id },
-            attributes: ['readingProgress', 'currentPage', 'isFavorite', 'addedDate']
+            attributes: ['readingProgress', 'currentPage', 'isFavorite']
           }),
           Wishlist.findOne({
             where: { userId, bookId: id }
@@ -147,7 +147,6 @@ class BookController {
           readingProgress: userLibrary?.readingProgress || 0,
           currentPage: userLibrary?.currentPage || 1,
           isFavorite: userLibrary?.isFavorite || false,
-          addedDate: userLibrary?.addedDate
         };
       }
 

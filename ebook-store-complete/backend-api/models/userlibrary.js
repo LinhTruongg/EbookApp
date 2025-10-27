@@ -70,11 +70,6 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    addedDate: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-      field: 'added_date'
-    },
     accessType: {
       type: DataTypes.ENUM('free', 'subscription'),
       defaultValue: 'free'

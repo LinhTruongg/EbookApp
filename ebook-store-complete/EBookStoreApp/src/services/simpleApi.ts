@@ -4,10 +4,9 @@ import { Platform } from 'react-native';
 // Simple API configuration
 const getApiUrl = () => {
   if (__DEV__) {
-    // Use network IP for both Android and iOS for better compatibility
-    return 'http://192.168.2.25:3000/api';
+    return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
   }
-  return 'https://your-production-api.com/api';
+  return process.env.EXPO_PUBLIC_API_URL;
 };
 
 class SimpleApiService {

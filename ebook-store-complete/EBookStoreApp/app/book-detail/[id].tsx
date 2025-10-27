@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, ActivityIndicator, Text } from 'react-native';
 import BookDetailScreen from '../../src/screens/book/BookDetail/BookDetailScreen';
-import { simpleApiService } from '../../src/services/simpleApi';
 import { Book } from '../../src/types';
 import { COLORS } from '../../src/constants';
+import { apiService } from '../../src/services/api';
 
 export default function BookDetail() {
   const { id } = useLocalSearchParams();
@@ -20,7 +20,7 @@ export default function BookDetail() {
       try {
         setLoading(true);
         const bookId = Array.isArray(id) ? id[0] : id;
-        const response = await simpleApiService.getBookById(bookId);
+        const response = await apiService.getBookById(bookId);
         if (response.success && response.data) {
           setBook(response.data.book);
           if ((response.data as any).userInfo) {

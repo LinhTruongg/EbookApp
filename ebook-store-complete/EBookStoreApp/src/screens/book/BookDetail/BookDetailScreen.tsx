@@ -42,13 +42,11 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   const [ratingLoading, setRatingLoading] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
-  // Removed pricing logic as this is now a free reading app
 
   const handleReadBook = () => {
+    console.log('book.id', book.id);
     router.push(`/book-reader/${book.id}`);
   };
-
-  // Removed purchase functionality as this is now a free reading app
 
   const handleGoBack = () => {
     const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
@@ -432,7 +430,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
         <TouchableOpacity style={styles.readButton} onPress={handleReadBook}>
-          <Text style={styles.readButtonText}>📖 Đọc sách</Text>
+          <Text style={styles.readButtonText}>Đọc sách</Text>
         </TouchableOpacity>
         {/* Removed purchase button as this is now a free reading app */}
       </View>
@@ -768,7 +766,7 @@ const styles = StyleSheet.create({
   },
   readButton: {
     flex: 1,
-    backgroundColor: COLORS.surface,
+    backgroundColor: COLORS.primary,
     paddingVertical: SIZES.spacing.md,
     borderRadius: SIZES.borderRadius.lg,
     alignItems: 'center',
@@ -777,7 +775,7 @@ const styles = StyleSheet.create({
   readButtonText: {
     fontSize: SIZES.font.md,
     fontWeight: '600',
-    color: COLORS.text,
+    color: COLORS.white,
   },
   purchaseButton: {
     flex: 1,

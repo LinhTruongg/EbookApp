@@ -28,6 +28,7 @@ export default function RootLayout() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="(admin)" options={{ headerShown: false }} />
             
+            <Stack.Screen name="book-detail/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="book-reader/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="category-detail/[id]" options={{ headerShown: true, title: 'Thể loại sách' }} />
             <Stack.Screen name="payment-method/[id]" options={{ headerShown: true, title: 'Phương thức thanh toán' }} />

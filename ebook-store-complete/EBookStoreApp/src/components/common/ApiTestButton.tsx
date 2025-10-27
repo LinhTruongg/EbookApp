@@ -7,7 +7,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { API_CONFIG, FALLBACK_URLS } from '../../constants/api';
+import { API_CONFIG } from '../../constants/api';
 
 const ApiTestButton: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -53,16 +53,16 @@ const ApiTestButton: React.FC = () => {
     console.log('🔍 Starting comprehensive API connection test...');
     
     // List of URLs to test (primary + fallbacks)
-    const urlsToTest = [API_CONFIG.BASE_URL, ...FALLBACK_URLS.filter(url => url !== API_CONFIG.BASE_URL)];
+    const urlsToTest = [API_CONFIG.BASE_URL];
     
     console.log('🔍 URLs to test:', urlsToTest);
     
     let successfulUrl = '';
     
     for (const baseUrl of urlsToTest) {
-      const success = await testSingleUrl(baseUrl);
+      const success = await testSingleUrl(baseUrl || '');
       if (success) {
-        successfulUrl = baseUrl;
+        successfulUrl = baseUrl || '';
         break;
       }
     }
@@ -92,9 +92,9 @@ const ApiTestButton: React.FC = () => {
   const getButtonStyle = () => {
     const baseStyle = [styles.button];
     if (connectionStatus === 'success') {
-      baseStyle.push(styles.buttonSuccess);
+      baseStyle.push({ ...styles.buttonSuccess, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, minWidth: 200, alignItems: 'center' });
     } else if (connectionStatus === 'failed') {
-      baseStyle.push(styles.buttonError);
+      baseStyle.push({ ...styles.buttonError, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, minWidth: 200, alignItems: 'center' });
     }
     return baseStyle;
   };

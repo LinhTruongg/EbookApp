@@ -14,7 +14,7 @@ class UserController {
           {
             model: UserLibrary,
             as: 'library',
-            attributes: ['bookId', 'addedDate', 'readingProgress', 'isFavorite'],
+            attributes: ['bookId', 'createdAt', 'readingProgress', 'isFavorite'],
             limit: 5,
             order: [['lastReadAt', 'DESC']]
           }
@@ -117,7 +117,7 @@ class UserController {
         page = 1,
         limit = 12,
         filter = 'all',
-        sortBy = 'addedDate',
+        sortBy = 'createdAt',
         sortOrder = 'DESC'
       } = req.query;
 
@@ -205,7 +205,7 @@ class UserController {
             }
           ]
         }],
-        order: [['lastReadAt', 'DESC'], ['addedDate', 'DESC']]
+        order: [['lastReadAt', 'DESC'], ['createdAt', 'DESC']]
       });
 
       // Categorize books by reading status
@@ -225,7 +225,7 @@ class UserController {
           lastReadAt: libraryBook.lastReadAt,
           isFavorite: libraryBook.isFavorite,
           readingTimeMinutes: libraryBook.readingTimeMinutes,
-          addedDate: libraryBook.addedDate,
+          createdAt: libraryBook.createdAt,
           accessType: libraryBook.accessType,
           notes: libraryBook.notes
         };
@@ -509,7 +509,7 @@ class UserController {
           {
             model: UserLibrary,
             as: 'library',
-            attributes: ['bookId', 'addedDate', 'readingProgress', 'isFavorite'],
+            attributes: ['bookId', 'createdAt', 'readingProgress', 'isFavorite'],
             limit: 10,
             order: [['lastReadAt', 'DESC']]
           }

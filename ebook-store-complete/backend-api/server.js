@@ -219,7 +219,6 @@ async function startServer() {
       console.log(`
 🚀 E-book Store API Server running!
 📍 Local URL: http://localhost:${PORT}
-📱 Network URL: http://192.168.2.25:${PORT}
 📚 API Docs: http://localhost:${PORT}/api-docs
 🔍 Health Check: http://localhost:${PORT}/health
 🌍 Environment: ${process.env.NODE_ENV || 'development'}

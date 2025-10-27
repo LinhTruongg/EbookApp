@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, API_ENDPOINTS, getApiUrl, FALLBACK_URLS } from '../constants/api';
+import { API_CONFIG, API_ENDPOINTS, getApiUrl } from '../constants/api';
 import {
   ApiResponse,
   AuthResponse,
@@ -21,7 +21,6 @@ import {
   CreateCommentRequest,
   UserLibaryEntity,
   Rating,
-  CreateRatingRequest,
   RatingStats,
 } from '../types';
 
@@ -33,15 +32,9 @@ const STORAGE_KEYS = {
 
 class ApiService {
   private axiosInstance: AxiosInstance;
-  private currentBaseURL: string;
 
   constructor() {
-    this.currentBaseURL = API_CONFIG.BASE_URL;
-    this.initializeAxios();
-  }
-
-  private initializeAxios() {
-    const baseURL = `${this.currentBaseURL}${API_CONFIG.API_VERSION}`;
+    const baseURL = API_CONFIG.BASE_URL || '';
     console.log('🔧 ApiService initialized with baseURL:', baseURL);
     
     this.axiosInstance = axios.create({
@@ -81,7 +74,7 @@ class ApiService {
   }
 
   private async findWorkingUrl(): Promise<string | null> {
-    const urlsToTest = [this.currentBaseURL, ...FALLBACK_URLS.filter(url => url !== this.currentBaseURL)];
+    const urlsToTest = [this.currentBaseURL || ''];
     console.log('🔍 Testing URLs:', urlsToTest);
     
     for (const url of urlsToTest) {
@@ -95,17 +88,6 @@ class ApiService {
     
     console.log('❌ No working URLs found');
     return null;
-  }
-
-  private async switchToWorkingUrl(): Promise<boolean> {
-    const workingUrl = await this.findWorkingUrl();
-    if (workingUrl && workingUrl !== this.currentBaseURL) {
-      console.log(`🔄 Switching from ${this.currentBaseURL} to ${workingUrl}`);
-      this.currentBaseURL = workingUrl;
-      this.initializeAxios();
-      return true;
-    }
-    return workingUrl !== null;
   }
 
   private setupInterceptors() {
@@ -207,17 +189,7 @@ class ApiService {
       return response.data;
     } catch (error: any) {
       console.error('❌ ApiService.login error:', error.response?.data || error.message);
-      
-      // If it's a network error, try to switch to a working URL and retry
-      if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
-        console.log('🔄 Network error detected, trying to find working URL...');
-        const switched = await this.switchToWorkingUrl();
-        if (switched) {
-          console.log('🔄 Retrying login with new URL...');
-          return this.login(data); // Retry with new URL
-        }
-      }
-      
+    
       throw error;
     }
   }

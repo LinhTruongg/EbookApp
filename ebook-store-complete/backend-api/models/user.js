@@ -202,13 +202,6 @@ module.exports = (sequelize, DataTypes) => {
       field: 'favorite_categories',
       defaultValue: []
     },
-    // Removed totalSpent and booksPurchased fields as this is now a free reading app
-    booksRead: {
-      type: DataTypes.INTEGER,
-      field: 'books_read',
-      defaultValue: 0,
-      allowNull: false
-    }
   }, {
     sequelize,
     modelName: 'User',

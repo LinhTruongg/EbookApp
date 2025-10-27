@@ -10,7 +10,7 @@ module.exports = {
         book_id: 1, // JavaScript từ Cơ bản đến Nâng cao
         purchase_date: new Date('2024-01-20'),
         price_paid: 249000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 3,
         max_downloads: -1,
         reading_progress: 75,
@@ -27,7 +27,7 @@ module.exports = {
         book_id: 4, // Digital Marketing Mastery
         purchase_date: new Date('2024-02-01'),
         price_paid: 229000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 100,
@@ -44,7 +44,7 @@ module.exports = {
         book_id: 6, // Những Ngày Thơ Ấu
         purchase_date: new Date('2024-02-15'),
         price_paid: 69000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 2,
         max_downloads: -1,
         reading_progress: 100,
@@ -61,7 +61,7 @@ module.exports = {
         book_id: 8, // Trí tuệ nhân tạo và Tương lai
         purchase_date: new Date('2024-03-01'),
         price_paid: 159000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 45,
@@ -78,7 +78,7 @@ module.exports = {
         book_id: 9, // Learning How to Learn
         purchase_date: new Date('2024-03-05'),
         price_paid: 239000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 0,
         max_downloads: -1,
         reading_progress: 0,
@@ -97,7 +97,7 @@ module.exports = {
         book_id: 2, // React Native Development Guide
         purchase_date: new Date('2024-01-25'),
         price_paid: 399000.00, // full price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 2,
         max_downloads: -1,
         reading_progress: 60,
@@ -114,7 +114,7 @@ module.exports = {
         book_id: 7, // Cuộc Đời Của Pi
         purchase_date: new Date('2024-02-10'),
         price_paid: 119000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 100,
@@ -131,7 +131,7 @@ module.exports = {
         book_id: 9, // Learning How to Learn
         purchase_date: new Date('2024-02-20'),
         price_paid: 239000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 3,
         max_downloads: -1,
         reading_progress: 30,
@@ -150,7 +150,7 @@ module.exports = {
         book_id: 1, // JavaScript từ Cơ bản đến Nâng cao
         purchase_date: new Date('2024-01-15'),
         price_paid: 249000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 5,
         max_downloads: -1,
         reading_progress: 100,
@@ -167,7 +167,7 @@ module.exports = {
         book_id: 2, // React Native Development Guide
         purchase_date: new Date('2024-01-18'),
         price_paid: 399000.00, // full price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 2,
         max_downloads: -1,
         reading_progress: 85,
@@ -184,7 +184,7 @@ module.exports = {
         book_id: 3, // Database Design Principles
         purchase_date: new Date('2024-01-22'),
         price_paid: 299000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 70,
@@ -201,7 +201,7 @@ module.exports = {
         book_id: 4, // Digital Marketing Mastery
         purchase_date: new Date('2024-02-05'),
         price_paid: 229000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 50,
@@ -218,7 +218,7 @@ module.exports = {
         book_id: 5, // Startup Success Stories
         purchase_date: new Date('2024-02-12'),
         price_paid: 329000.00, // full price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 2,
         max_downloads: -1,
         reading_progress: 100,
@@ -235,7 +235,7 @@ module.exports = {
         book_id: 6, // Những Ngày Thơ Ấu
         purchase_date: new Date('2024-02-18'),
         price_paid: 69000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 100,
@@ -252,7 +252,7 @@ module.exports = {
         book_id: 8, // Trí tuệ nhân tạo và Tương lai
         purchase_date: new Date('2024-02-25'),
         price_paid: 159000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 1,
         max_downloads: -1,
         reading_progress: 80,
@@ -269,7 +269,7 @@ module.exports = {
         book_id: 9, // Learning How to Learn
         purchase_date: new Date('2024-03-02'),
         price_paid: 239000.00, // discount price
-        access_type: 'purchased',
+        access_type: 'free',
         download_count: 0,
         max_downloads: -1,
         reading_progress: 15,
