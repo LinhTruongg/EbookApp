@@ -70,27 +70,14 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
-    purchaseDate: {
+    addedDate: {
       type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW
-    },
-    pricePaid: {
-      type: DataTypes.DECIMAL(10, 2),
-      allowNull: false,
-      validate: {
-        min: { args: 0, msg: 'Giá mua không thể âm' }
-      }
-    },
-    orderId: {
-      type: DataTypes.INTEGER,
-      references: {
-        model: 'orders',
-        key: 'id'
-      }
+      defaultValue: DataTypes.NOW,
+      field: 'added_date'
     },
     accessType: {
-      type: DataTypes.ENUM('purchased', 'free', 'subscription'),
-      defaultValue: 'purchased'
+      type: DataTypes.ENUM('free', 'subscription'),
+      defaultValue: 'free'
     },
     downloadCount: {
       type: DataTypes.INTEGER,

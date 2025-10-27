@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import BookReaderScreen from '../../src/screens/book/BookReader/BookReaderScreen';
-import { apiService } from '../../src/services/api';
+import { simpleApiService } from '../../src/services/simpleApi';
 import { Book } from '../../src/types';
 import { COLORS } from '../../src/constants';
 
@@ -20,7 +20,7 @@ export default function BookReader() {
       try {
         setLoading(true);
         const bookId = Array.isArray(id) ? id[0] : id;
-        const response = await apiService.getBookById(bookId);
+        const response = await simpleApiService.getBookById(bookId);
         if (response.success && response.data) {
           setBook(response.data.book);
         }

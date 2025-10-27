@@ -40,7 +40,7 @@ class ReviewController {
         rating,
         title,
         content,
-        isVerifiedPurchase: !!libraryEntry
+        isVerifiedReader: !!libraryEntry
       });
 
       const reviewWithUser = await Review.findByPk(review.id, {

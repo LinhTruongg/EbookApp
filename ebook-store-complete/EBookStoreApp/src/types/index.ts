@@ -19,8 +19,7 @@ export interface User {
     lineHeight: number;
   };
   favoriteCategories: number[];
-  totalSpent: number;
-  booksPurchased: number;
+  booksRead: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +64,35 @@ export interface ChangePasswordRequest {
   newPassword: string;
 }
 
+export interface Rating {
+  id: string;
+  userId: string;
+  bookId: string;
+  rating: number;
+  createdAt: string;
+  updatedAt: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    avatar?: string;
+  };
+}
+
+export interface CreateRatingRequest {
+  bookId: string;
+  rating: number;
+}
+
+export interface RatingStats {
+  averageRating: number;
+  totalRatings: number;
+  ratingDistribution: {
+    rating: number;
+    count: number;
+  }[];
+}
+
 export interface RefreshTokenRequest {
   refreshToken: string;
 }
@@ -92,26 +120,38 @@ export interface BookDetailResponse {
 export interface Book {
   id: string;
   title: string;
+  subtitle?: string;
   description: string;
   isbn: string;
-  price: number;
-  discountPrice?: number;
+  // Removed price and discountPrice fields as this is now a free reading app
   coverImage?: string;
   fileUrl?: string;
+  fileSize?: number;
+  previewUrl?: string;
+  samplePages?: number;
   assetId?: string;
   downloadableUrl?: string;
   pageCount: number;
   language: string;
+  publicationDate?: string;
   publishedDate: string;
   publisher: string;
   isActive: boolean;
   isFeatured: boolean;
+  isBestseller?: boolean;
+  isNewRelease?: boolean;
   downloadCount: number;
   viewCount: number;
   rating: number;
   reviewCount: number;
+  totalReviews?: number;
+  // Removed totalPurchases and totalRevenue fields as this is now a free reading app
+  categoryId?: number;
+  category?: Category;
   authors?: Author[];
   categories?: Category[];
+  tags?: string[];
+  metadata?: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,9 +164,9 @@ export interface UserLibaryEntity {
   readProgress: number;
   currentPage: number;
   isFavorite: boolean;
-  purchaseDate?: string;
+  addedDate?: string;
   readingTimeInMinutes?: number;
-  accessType: string;
+  accessType: 'free' | 'subscription';
   notes?: string;
 }
 

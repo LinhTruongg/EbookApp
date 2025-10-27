@@ -11,6 +11,7 @@ import {
   Dimensions,
 } from 'react-native';
 import LoginForm from '../../../components/auth/LoginForm';
+import ApiTestButton from '../../../components/common/ApiTestButton';
 import { COLORS, SIZES } from '../../../constants';
 
 interface LoginScreenProps {
@@ -55,6 +56,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
             <View style={styles.formSection}>
               <View style={styles.formContainer}>
                 <LoginForm />
+                
+                {/* API Test Button for Debugging */}
+                <View style={styles.debugSection}>
+                  <ApiTestButton />
+                </View>
                 
                 {/* Forgot Password Link */}
                 <TouchableOpacity

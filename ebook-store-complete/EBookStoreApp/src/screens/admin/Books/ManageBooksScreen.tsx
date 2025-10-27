@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { apiService } from '../../../services/api';
 import { Book, Category, Author } from '../../../types';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 interface ManageBooksScreenProps {
   route?: {
@@ -27,28 +28,30 @@ interface ManageBooksScreenProps {
 
 const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation }) => {
   const [books, setBooks] = useState<Book[]>([]);
+  const [filteredBooks, setFilteredBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [authors, setAuthors] = useState<Author[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingBook, setEditingBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
 
   const [formData, setFormData] = useState({
     title: '',
     subtitle: '',
     description: '',
     isbn: '',
-    price: '',
-    discountPrice: '',
     categoryId: '',
     publisher: '',
     publicationDate: '',
     pageCount: '',
     language: 'vi',
     authorIds: [] as string[],
-    status: 'active',
     isFeatured: false,
     isBestseller: false,
     isNewRelease: false,
@@ -63,15 +66,13 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         subtitle: route.params.editBook.subtitle || '',
         description: route.params.editBook.description,
         isbn: route.params.editBook.isbn || '',
-        price: route.params.editBook.price.toString(),
-        discountPrice: route.params.editBook.discountPrice?.toString() || '',
+        // Removed price fields as this is now a free reading app
         categoryId: route.params.editBook.categoryId?.toString() || '',
         publisher: route.params.editBook.publisher || '',
         publicationDate: route.params.editBook.publicationDate || '',
         pageCount: route.params.editBook.pageCount?.toString() || '',
         language: route.params.editBook.language || 'vi',
         authorIds: route.params.editBook.authors?.map(a => a.id) || [],
-        status: route.params.editBook.status || 'active',
         isFeatured: route.params.editBook.isFeatured || false,
         isBestseller: route.params.editBook.isBestseller || false,
         isNewRelease: route.params.editBook.isNewRelease || false,
@@ -79,6 +80,14 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
       setModalVisible(true);
     }
   }, [route?.params?.editBook]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  useEffect(() => {
+    filterBooks();
+  }, [books, searchQuery]);
 
   const loadData = async () => {
     try {
@@ -109,33 +118,108 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     setRefreshing(false);
   };
 
+  const filterBooks = () => {
+    if (!searchQuery.trim()) {
+      setFilteredBooks(books);
+    } else {
+      const filtered = books.filter(book =>
+        (book.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (book.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (book.isbn || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (book.authors?.[0]?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (book.category?.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredBooks(filtered);
+    }
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
       subtitle: '',
       description: '',
       isbn: '',
-      price: '',
-      discountPrice: '',
       categoryId: '',
       publisher: '',
       publicationDate: '',
       pageCount: '',
       language: 'vi',
       authorIds: [],
-      status: 'active',
       isFeatured: false,
       isBestseller: false,
       isNewRelease: false,
     });
     setEditingBook(null);
+    setValidationErrors({});
   };
 
   const handleSubmit = async () => {
-    if (!formData.title.trim() || !formData.description.trim() || !formData.price.trim() || !formData.categoryId.trim()) {
-      Alert.alert('Lỗi', 'Tiêu đề, mô tả, giá và danh mục là bắt buộc');
+    // Validate required fields
+    const errors = [];
+    
+    if (!formData.title.trim()) {
+      errors.push('• Tiêu đề sách');
+    }
+    
+    if (!formData.description.trim()) {
+      errors.push('• Mô tả sách');
+    }
+    
+    if (!formData.categoryId.trim()) {
+      errors.push('• Danh mục sách');
+    }
+    
+    // Validate description length
+    if (formData.description.trim() && formData.description.trim().length < 1) {
+      errors.push('• Mô tả sách phải có ít nhất 1 ký tự');
+    }
+    
+    // Validate title length
+    if (formData.title.trim() && formData.title.trim().length < 1) {
+      errors.push('• Tiêu đề sách phải có ít nhất 1 ký tự');
+    }
+    
+    // Validate ISBN format if provided
+    if (formData.isbn.trim() && (formData.isbn.trim().length < 10 || formData.isbn.trim().length > 20)) {
+      errors.push('• ISBN phải từ 10-20 ký tự');
+    }
+    
+    // Validate page count if provided
+    if (formData.pageCount && (isNaN(parseInt(formData.pageCount)) || parseInt(formData.pageCount) < 1)) {
+      errors.push('• Số trang phải là số dương');
+    }
+    
+    // Validate publication date format if provided
+    if (formData.publicationDate && formData.publicationDate.trim()) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(formData.publicationDate.trim())) {
+        errors.push('• Ngày xuất bản phải có định dạng YYYY-MM-DD');
+      }
+    }
+    
+    if (errors.length > 0) {
+      // Set validation errors for visual feedback
+      const fieldErrors: {[key: string]: string} = {};
+      if (!formData.title.trim()) fieldErrors.title = 'Tiêu đề sách là bắt buộc';
+      if (!formData.description.trim()) fieldErrors.description = 'Mô tả sách là bắt buộc';
+      if (!formData.categoryId.trim()) fieldErrors.categoryId = 'Danh mục sách là bắt buộc';
+      
+      setValidationErrors(fieldErrors);
+      
+      Alert.alert(
+        '⚠️ Thông tin không hợp lệ', 
+        'Vui lòng kiểm tra lại các thông tin sau:\n\n' + errors.join('\n'),
+        [{ text: 'Đóng', style: 'default' }]
+      );
       return;
     }
+    
+    // Clear validation errors if all fields are valid
+    setValidationErrors({});
 
     try {
       const submitData = {
@@ -143,8 +227,7 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         subtitle: formData.subtitle.trim() || undefined,
         description: formData.description.trim(),
         isbn: formData.isbn.trim() || undefined,
-        price: parseFloat(formData.price),
-        discountPrice: formData.discountPrice ? parseFloat(formData.discountPrice) : undefined,
+        // Removed price fields as this is now a free reading app
         categoryId: parseInt(formData.categoryId),
         publisher: formData.publisher.trim() || undefined,
         publicationDate: formData.publicationDate || undefined,
@@ -153,7 +236,6 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         authorIds: (formData.authorIds || [])
           .map((id) => parseInt(String(id), 10))
           .filter((n) => Number.isFinite(n)),
-        status: formData.status,
         isFeatured: formData.isFeatured,
         isBestseller: formData.isBestseller,
         isNewRelease: formData.isNewRelease,
@@ -187,38 +269,37 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
   };
 
   const handleDelete = (book: Book) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa sách "${book.title}"?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await apiService.deleteBook(book.id);
-              if (response.success) {
-                Alert.alert('Thành công', response.message || 'Xóa sách thành công');
-                loadData();
-              } else {
-                Alert.alert('Lỗi', response.message || 'Không thể xóa sách');
-              }
-            } catch (error) {
-              console.error('Delete error:', error);
-              Alert.alert('Lỗi', 'Có lỗi xảy ra khi xóa sách');
-            }
-          },
-        },
-      ]
-    );
+    setBookToDelete(book);
+    setDeleteDialogVisible(true);
   };
 
-  const filteredBooks = books.filter(book =>
-    (book.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (book.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (book.isbn || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const confirmDelete = async () => {
+    if (!bookToDelete) return;
+    
+    try {
+      setDeletingId(bookToDelete.id);
+      const response = await apiService.deleteBook(bookToDelete.id);
+      if (response.success) {
+        Alert.alert('✅ Thành công', response.message || 'Xóa sách thành công');
+        loadData();
+      } else {
+        Alert.alert('❌ Lỗi', response.message || 'Không thể xóa sách');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      Alert.alert('❌ Lỗi', 'Có lỗi xảy ra khi xóa sách');
+    } finally {
+      setDeletingId(null);
+      setDeleteDialogVisible(false);
+      setBookToDelete(null);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogVisible(false);
+    setBookToDelete(null);
+  };
+
 
   const renderBookItem = ({ item }: { item: Book }) => (
     <View style={styles.bookItem}>
@@ -230,21 +311,10 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         <Text style={styles.bookCategory}>
           📂 {item.category?.name || 'Chưa phân loại'}
         </Text>
-        <Text style={styles.bookPrice}>
-          💰 {item.discountPrice ? item.discountPrice.toLocaleString() : item.price.toLocaleString()} VNĐ
+        <Text style={styles.bookAccess}>
+          📖 Đọc miễn phí
         </Text>
         <View style={styles.bookMeta}>
-          <View style={[
-            styles.statusBadge,
-            item.status === 'active' ? styles.activeBadge : styles.inactiveBadge
-          ]}>
-            <Text style={[
-              styles.statusText,
-              item.status === 'active' ? styles.activeText : styles.inactiveText
-            ]}>
-              {item.status === 'active' ? 'Hoạt động' : 'Tạm dừng'}
-            </Text>
-          </View>
           {item.isFeatured && <Text style={styles.featuredBadge}>⭐ Nổi bật</Text>}
         </View>
       </View>
@@ -258,15 +328,13 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               subtitle: item.subtitle || '',
               description: item.description,
               isbn: item.isbn || '',
-              price: item.price.toString(),
-              discountPrice: item.discountPrice?.toString() || '',
+              // Removed price fields as this is now a free reading app
               categoryId: (item as any).categoryId?.toString() || '',
               publisher: item.publisher || '',
               publicationDate: item.publicationDate || '',
               pageCount: item.pageCount?.toString() || '',
               language: item.language || 'vi',
               authorIds: item.authors?.map(a => a.id) || [],
-              status: item.status || 'active',
               isFeatured: item.isFeatured || false,
               isBestseller: item.isBestseller || false,
               isNewRelease: item.isNewRelease || false,
@@ -274,13 +342,16 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
             setModalVisible(true);
           }}
         >
-          <Text style={styles.editButtonText}>✏️</Text>
+          <Text style={styles.editButtonText}>Sửa</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.deleteButton}
+          style={[styles.deleteButton, deletingId === item.id && styles.disabledButton]}
           onPress={() => handleDelete(item)}
+          disabled={deletingId === item.id}
         >
-          <Text style={styles.deleteButtonText}>🗑️</Text>
+          <Text style={styles.deleteButtonText}>
+            {deletingId === item.id ? 'Đang xóa...' : 'Xóa'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -299,7 +370,15 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Quản lý sách</Text>
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm sách..."
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholderTextColor="#999"
+          />
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
@@ -311,27 +390,19 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm kiếm sách..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
       <FlatList
         data={filteredBooks}
         renderItem={renderBookItem}
         keyExtractor={(item) => String((item as any).id)}
-        style={styles.booksList}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>📚 Chưa có sách nào</Text>
-            <Text style={styles.emptySubtext}>Hãy thêm cuốn sách đầu tiên của bạn</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? 'Không tìm thấy sách nào' : 'Chưa có sách nào'}
+            </Text>
           </View>
         }
       />
@@ -340,6 +411,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         visible={modalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
+        accessibilityViewIsModal={true}
+        accessibilityLabel="Form thêm/sửa sách"
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -361,11 +434,24 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tiêu đề *</Text>
               <TextInput
-                style={styles.input}
+                style={[
+                  styles.input,
+                  validationErrors.title && styles.inputError
+                ]}
                 value={formData.title}
-                onChangeText={(text) => setFormData({ ...formData, title: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, title: text });
+                  if (validationErrors.title) {
+                    setValidationErrors({...validationErrors, title: ''});
+                  }
+                }}
                 placeholder="Nhập tiêu đề sách"
+                accessibilityLabel="Tiêu đề sách"
+                accessibilityHint="Nhập tiêu đề của cuốn sách"
               />
+              {validationErrors.title && (
+                <Text style={styles.errorText}>{validationErrors.title}</Text>
+              )}
             </View>
 
             <View style={styles.formGroup}>
@@ -381,13 +467,27 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
             <View style={styles.formGroup}>
               <Text style={styles.label}>Mô tả *</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
+                style={[
+                  styles.input, 
+                  styles.textArea,
+                  validationErrors.description && styles.inputError
+                ]}
                 value={formData.description}
-                onChangeText={(text) => setFormData({ ...formData, description: text })}
+                onChangeText={(text) => {
+                  setFormData({ ...formData, description: text });
+                  if (validationErrors.description) {
+                    setValidationErrors({...validationErrors, description: ''});
+                  }
+                }}
                 placeholder="Nhập mô tả sách"
                 multiline
                 numberOfLines={4}
+                accessibilityLabel="Mô tả sách"
+                accessibilityHint="Nhập mô tả chi tiết về cuốn sách"
               />
+              {validationErrors.description && (
+                <Text style={styles.errorText}>{validationErrors.description}</Text>
+              )}
             </View>
 
             <View style={styles.formRow}>
@@ -411,28 +511,7 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               </View>
             </View>
 
-            <View style={styles.formRow}>
-              <View style={[styles.formGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Giá *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.price}
-                  onChangeText={(text) => setFormData({ ...formData, price: text })}
-                  placeholder="Nhập giá"
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={[styles.formGroup, styles.halfWidth]}>
-                <Text style={styles.label}>Giá khuyến mãi</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.discountPrice}
-                  onChangeText={(text) => setFormData({ ...formData, discountPrice: text })}
-                  placeholder="Nhập giá khuyến mãi"
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
+            {/* Removed price fields as this is now a free reading app */}
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Danh mục *</Text>
@@ -442,9 +521,15 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
                     key={category.id}
                     style={[
                       styles.categoryChip,
-                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChip
+                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChip,
+                      validationErrors.categoryId && styles.categoryChipError
                     ]}
-                    onPress={() => setFormData({ ...formData, categoryId: String((category as any).id) })}
+                    onPress={() => {
+                      setFormData({ ...formData, categoryId: String((category as any).id) });
+                      if (validationErrors.categoryId) {
+                        setValidationErrors({...validationErrors, categoryId: ''});
+                      }
+                    }}
                   >
                     <Text style={[
                       styles.categoryChipText,
@@ -455,6 +540,9 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
                   </TouchableOpacity>
                 ))}
               </ScrollView>
+              {validationErrors.categoryId && (
+                <Text style={styles.errorText}>{validationErrors.categoryId}</Text>
+              )}
             </View>
 
             <View style={styles.formRow}>
@@ -489,16 +577,6 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               />
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Trạng thái</Text>
-              <View style={styles.switchContainer}>
-                <Text style={styles.switchLabel}>Hoạt động</Text>
-                <Switch
-                  value={formData.status === 'active'}
-                  onValueChange={(value) => setFormData({ ...formData, status: value ? 'active' : 'inactive' })}
-                />
-              </View>
-            </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Tính năng đặc biệt</Text>
@@ -525,7 +603,13 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               </View>
             </View>
 
-            <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+            <TouchableOpacity 
+              style={styles.submitButton} 
+              onPress={handleSubmit}
+              accessibilityRole="button"
+              accessibilityLabel={editingBook ? 'Cập nhật sách' : 'Tạo sách'}
+              accessibilityHint={editingBook ? 'Lưu thay đổi thông tin sách' : 'Tạo sách mới với thông tin đã nhập'}
+            >
               <Text style={styles.submitButtonText}>
                 {editingBook ? 'Cập nhật sách' : 'Tạo sách'}
               </Text>
@@ -533,6 +617,21 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        visible={deleteDialogVisible}
+        title="🗑️ Xác nhận xóa sách"
+        message={bookToDelete ? 
+          `Bạn có chắc chắn muốn xóa sách "${bookToDelete.title}"?\n\n⚠️ Cảnh báo: Sách sẽ được xóa hoàn toàn khỏi hệ thống và không thể khôi phục.` 
+          : ''
+        }
+        confirmText="🗑️ Xóa"
+        cancelText="❌ Hủy"
+        type="danger"
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </SafeAreaView>
   );
 };
@@ -540,54 +639,55 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    borderBottomColor: '#e0e0e0',
+    gap: 12,
   },
   searchContainer: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    flex: 1,
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f9f9f9',
+    height: 40,
   },
-  booksList: {
-    flex: 1,
-    padding: 20,
+  addButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  listContainer: {
+    padding: 16,
   },
   bookItem: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: '#fff',
     padding: 16,
     marginBottom: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -600,92 +700,78 @@ const styles = StyleSheet.create({
   bookTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+    color: '#333',
   },
   bookAuthor: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   bookCategory: {
-    fontSize: 12,
-    color: '#6366F1',
-    marginBottom: 4,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
-  bookPrice: {
+  bookAccess: {
     fontSize: 14,
     color: '#059669',
     fontWeight: '600',
-    marginBottom: 8,
+    marginTop: 4,
   },
   bookMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  activeBadge: {
-    backgroundColor: '#D1FAE5',
-  },
-  inactiveBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  activeText: {
-    color: '#065F46',
-  },
-  inactiveText: {
-    color: '#991B1B',
+    marginTop: 8,
   },
   featuredBadge: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#D97706',
     fontWeight: '600',
   },
   bookActions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
   },
   editButton: {
     backgroundColor: '#3B82F6',
-    padding: 8,
-    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    minWidth: 60,
   },
   editButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#EF4444',
-    padding: 8,
-    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    minWidth: 60,
+  },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
   },
   deleteButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: 16,
+    color: '#666',
   },
   loadingContainer: {
     flex: 1,
@@ -792,8 +878,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  inputError: {
+    borderColor: '#EF4444',
+    borderWidth: 2,
+  },
+  categoryChipError: {
+    borderColor: '#EF4444',
+    borderWidth: 2,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
+    marginLeft: 4,
+  },
 });
 
 export default ManageBooksScreen;
-
-

@@ -25,7 +25,6 @@ module.exports = (sequelize, DataTypes) => {
     // Instance methods
     async updateBookCount() {
       const count = await this.countBooks({ 
-        where: { status: 'active' } 
       });
       this.booksCount = count;
       await this.save();

@@ -30,6 +30,8 @@ interface CategoryFormData {
 
 const ManageCategoriesScreen: React.FC = () => {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -48,6 +50,10 @@ const ManageCategoriesScreen: React.FC = () => {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  useEffect(() => {
+    filterCategories();
+  }, [categories, searchQuery]);
 
   const loadCategories = async () => {
     try {
@@ -74,6 +80,23 @@ const ManageCategoriesScreen: React.FC = () => {
     setRefreshing(true);
     await loadCategories();
     setRefreshing(false);
+  };
+
+  const filterCategories = () => {
+    if (!searchQuery.trim()) {
+      setFilteredCategories(categories);
+    } else {
+      const filtered = categories.filter(category =>
+        category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        category.slug.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (category.description && category.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+      setFilteredCategories(filtered);
+    }
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
   };
 
   const generateSlug = (name: string) => {
@@ -223,18 +246,18 @@ const ManageCategoriesScreen: React.FC = () => {
       </View>
       <View style={styles.categoryActions}>
         <TouchableOpacity
-          style={[styles.iconButton, styles.editButton]}
+          style={styles.editButton}
           onPress={() => openEditModal(item)}
           accessibilityLabel="Sửa"
         >
-          <Text style={styles.iconText}>✏️</Text>
+          <Text style={styles.editButtonText}>Sửa</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.iconButton, styles.deleteButton]}
+          style={styles.deleteButton}
           onPress={() => handleDelete(item)}
           accessibilityLabel="Xóa"
         >
-          <Text style={styles.iconText}>🗑️</Text>
+          <Text style={styles.deleteButtonText}>Xóa</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -254,13 +277,22 @@ const ManageCategoriesScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <View style={styles.searchContainer}>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tìm kiếm chủ đề..."
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholderTextColor="#999"
+          />
+        </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
           <Text style={styles.addButtonText}>+ Thêm chủ đề</Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
-        data={categories}
+        data={filteredCategories}
         keyExtractor={(item) => item.id}
         renderItem={renderCategoryItem}
         refreshControl={
@@ -269,7 +301,9 @@ const ManageCategoriesScreen: React.FC = () => {
         contentContainerStyle={styles.listContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>Chưa có chủ đề nào</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? 'Không tìm thấy chủ đề nào' : 'Chưa có chủ đề nào'}
+            </Text>
           </View>
         }
       />
@@ -417,6 +451,20 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    gap: 12,
+  },
+  searchContainer: {
+    flex: 1,
+  },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    height: 40,
   },
   title: {
     fontSize: 20,
@@ -428,6 +476,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addButtonText: {
     color: '#fff',
@@ -495,25 +546,34 @@ const styles = StyleSheet.create({
   },
   categoryActions: {
     flexDirection: 'row',
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    gap: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
   },
   editButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  editButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   deleteButton: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#EF4444',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    minWidth: 60,
   },
-  iconText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
+  deleteButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -603,5 +663,3 @@ const styles = StyleSheet.create({
 });
 
 export default ManageCategoriesScreen;
-
-

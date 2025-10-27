@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
-import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
 import { Book } from '../../../types';
 import { useRouter } from 'expo-router';
 import SearchBar from '../../../components/common/SearchBar';
@@ -51,10 +51,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
       
       // Load all books, featured, bestsellers, and new releases in parallel
       const [allBooksResponse, featuredResponse, bestsellerResponse, newReleaseResponse] = await Promise.all([
-        apiService.getBooks(),
-        apiService.getFeaturedBooks(),
-        apiService.getBestsellerBooks(),
-        apiService.getNewReleaseBooks()
+        simpleApiService.getBooks(),
+        simpleApiService.getFeaturedBooks(),
+        simpleApiService.getBestsellerBooks(),
+        simpleApiService.getNewReleaseBooks()
       ]);
 
       if (allBooksResponse.success && allBooksResponse.data) {
@@ -141,7 +141,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
 
   const renderBookItem = ({ item }: { item: Book }) => {
     const authors = item.authors?.map(author => author.name).join(', ') || 'Unknown';
-    const finalPrice = item.discountPrice || item.price;
+    // Removed price logic as this is now a free reading app
     
     return (
       <TouchableOpacity 
@@ -157,11 +157,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
         />
         <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>{authors}</Text>
-        {finalPrice && (
-          <Text style={styles.bookPrice}>
-            {parseFloat(finalPrice).toLocaleString('vi-VN')}đ
-          </Text>
-        )}
+        <Text style={styles.bookPrice}>
+          Đọc miễn phí
+        </Text>
         {item.rating && parseFloat(item.rating) > 0 && (
           <View style={styles.ratingContainer}>
             <Text style={styles.ratingText}>⭐ {item.rating}</Text>

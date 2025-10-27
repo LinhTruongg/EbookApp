@@ -11,11 +11,7 @@ module.exports = (sequelize, DataTypes) => {
         as: 'library'
       });
       
-      // User có nhiều orders
-      User.hasMany(models.Order, {
-        foreignKey: 'userId',
-        as: 'orders'
-      });
+      // Removed Order association as this is now a free reading app
       
       // User có nhiều reviews
       User.hasMany(models.Review, {
@@ -206,15 +202,10 @@ module.exports = (sequelize, DataTypes) => {
       field: 'favorite_categories',
       defaultValue: []
     },
-    totalSpent: {
-      type: DataTypes.DECIMAL(12, 2),
-      field: 'total_spent',
-      defaultValue: 0.00,
-      allowNull: false
-    },
-    booksPurchased: {
+    // Removed totalSpent and booksPurchased fields as this is now a free reading app
+    booksRead: {
       type: DataTypes.INTEGER,
-      field: 'books_purchased',
+      field: 'books_read',
       defaultValue: 0,
       allowNull: false
     }

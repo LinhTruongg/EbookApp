@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import CategoryDetailScreen from '../../src/screens/home/Categories/CategoryDetailScreen';
-import { apiService } from '../../src/services/api';
+import { simpleApiService } from '../../src/services/simpleApi';
 import { Category } from '../../src/types';
 import { COLORS } from '../../src/constants';
 
@@ -20,7 +20,7 @@ export default function CategoryDetail() {
       try {
         setLoading(true);
         const categoryId = Array.isArray(id) ? id[0] : id;
-        const response = await apiService.getCategoryById(categoryId);
+        const response = await simpleApiService.getCategoryById(categoryId);
         if (response.success && response.data) {
           setCategory(response.data);
         }

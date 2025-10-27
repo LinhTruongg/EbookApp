@@ -151,25 +151,7 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title, hideHeader =
       
       {/* Main Content */}
       <View style={[styles.content, { marginLeft: sidebarWidth }]}>
-        {!hideHeader && (
-          <View style={styles.contentHeader}>
-            <View style={styles.headerLeft}>
-              <Text style={styles.contentTitle}>{title}</Text>
-              <Text style={styles.contentSubtitle}>Quản lý hệ thống</Text>
-            </View>
-            <View style={styles.headerRight}>
-              <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="search" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="notifications-outline" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.headerButton}>
-                <Ionicons name="settings-outline" size={20} color={COLORS.textSecondary} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+     
         <ScrollView style={styles.contentBody} showsVerticalScrollIndicator={false}>
           {children}
         </ScrollView>

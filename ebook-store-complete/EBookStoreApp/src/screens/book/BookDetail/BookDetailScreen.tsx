@@ -14,9 +14,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
-import { Book, Comment, CommentsResponse } from '../../../types';
+import { Book, Comment, CommentsResponse, Rating, RatingStats } from '../../../types';
 import { apiService } from '../../../services/api';
 import { eventBus } from '../../../utils/eventBus';
+import StarRating from '../../../components/common/StarRating';
+import RatingDistributionChart from '../../../components/common/RatingDistributionChart';
+import LoadingStarRating from '../../../components/common/LoadingStarRating';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -34,18 +37,18 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   const [inWishlist, setInWishlist] = useState<boolean>(initialInWishlist);
   const [suggestedBooks, setSuggestedBooks] = useState<Book[]>([]);
   const [suggestedLoading, setSuggestedLoading] = useState<boolean>(false);
+  const [userRating, setUserRating] = useState<Rating | null>(null);
+  const [ratingStats, setRatingStats] = useState<RatingStats | null>(null);
+  const [ratingLoading, setRatingLoading] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
-  const finalPrice = book.discountPrice || book.price;
-  const hasDiscount = book.discountPrice && book.discountPrice < book.price;
+  // Removed pricing logic as this is now a free reading app
 
   const handleReadBook = () => {
     router.push(`/book-reader/${book.id}`);
   };
 
-  const handlePurchase = () => {
-    router.push(`/payment-method/${book.id}`);
-  };
+  // Removed purchase functionality as this is now a free reading app
 
   const handleGoBack = () => {
     const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
@@ -84,6 +87,47 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
     }
   };
 
+  const loadRatingData = async () => {
+    try {
+      setRatingLoading(true);
+      const [userRatingRes, ratingStatsRes] = await Promise.all([
+        apiService.getUserRating(book.id),
+        apiService.getBookRatingStats(book.id)
+      ]);
+      
+      if (userRatingRes.success) {
+        setUserRating(userRatingRes.data);
+      }
+      
+      if (ratingStatsRes.success && ratingStatsRes.data) {
+        setRatingStats(ratingStatsRes.data);
+      }
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
+  const handleRatingChange = async (rating: number) => {
+    try {
+      setRatingLoading(true);
+      const res = await apiService.createOrUpdateRating(book.id, rating);
+      if (res.success && res.data) {
+        setUserRating(res.data);
+        // Reload rating stats to update average
+        const statsRes = await apiService.getBookRatingStats(book.id);
+        if (statsRes.success && statsRes.data) {
+          setRatingStats(statsRes.data);
+        }
+      }
+    } catch (e) {
+      // ignore for now
+    } finally {
+      setRatingLoading(false);
+    }
+  };
+
   const handlePostComment = async () => {
     const content = newComment.trim();
     if (!content) return;
@@ -116,6 +160,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   useEffect(() => {
     loadComments();
     loadSuggestedBooks();
+    loadRatingData();
   }, [book.id]);
 
   const toggleWishlist = async () => {
@@ -160,12 +205,25 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
             <Text style={styles.bookAuthor}>{authors}</Text>
             
             {/* Rating */}
-            {book.rating && book.rating > 0 && (
-              <View style={styles.ratingContainer}>
-                <Text style={styles.ratingText}>⭐ {book.rating}</Text>
-                <Text style={styles.reviewsText}>({book.reviewCount || 0} đánh giá)</Text>
-              </View>
-            )}
+            <View style={styles.ratingContainer}>
+              {ratingLoading ? (
+                <View style={styles.ratingLoading}>
+                  <ActivityIndicator size="small" color={COLORS.primary} />
+                  <Text style={styles.loadingText}>Đang tải đánh giá...</Text>
+                </View>
+              ) : (
+                <View style={styles.ratingSection}>
+                  <StarRating
+                    rating={ratingStats?.averageRating || book.rating || 0}
+                    size="medium"
+                    showText={true}
+                  />
+                  <Text style={styles.reviewsText}>
+                    ({ratingStats?.totalRatings || book.reviewCount || 0} đánh giá)
+                  </Text>
+                </View>
+              )}
+            </View>
 
             {/* Category */}
             {book.categories && book.categories.length > 0 && (
@@ -174,17 +232,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
               </View>
             )}
 
-            {/* Price */}
-            <View style={styles.priceContainer}>
-              <Text style={styles.currentPrice}>
-                {finalPrice ? `${finalPrice.toLocaleString('vi-VN')}đ` : 'Miễn phí'}
-              </Text>
-              {hasDiscount && (
-                <Text style={styles.originalPrice}>
-                  {book.price.toLocaleString('vi-VN')}đ
-                </Text>
-              )}
-            </View>
+            {/* Free reading app - no pricing needed */}
           </View>
         </View>
 
@@ -239,6 +287,56 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
               <Text style={styles.badgeText}>⭐ Nổi bật</Text>
             </View>
           )}
+        </View>
+
+        {/* Rating Section */}
+        <View style={styles.ratingSection}>
+          <Text style={styles.sectionTitle}>Đánh giá sách</Text>
+          
+          {/* Current Rating Display */}
+          <View style={styles.currentRatingContainer}>
+            <View style={styles.ratingDisplay}>
+              <StarRating
+                rating={ratingStats?.averageRating || book.rating || 0}
+                size="large"
+                showText={true}
+              />
+              <Text style={styles.ratingCount}>
+                {ratingStats?.totalRatings || book.reviewCount || 0} đánh giá
+              </Text>
+            </View>
+          </View>
+
+          {/* Rating Distribution Chart */}
+          {ratingStats && ratingStats.totalRatings > 0 && (
+            <RatingDistributionChart
+              ratingDistribution={ratingStats.ratingDistribution}
+              totalRatings={ratingStats.totalRatings}
+            />
+          )}
+
+          {/* User Rating Input */}
+          <View style={styles.userRatingContainer}>
+            <Text style={styles.userRatingTitle}>Đánh giá của bạn</Text>
+            {ratingLoading ? (
+              <LoadingStarRating />
+            ) : (
+              <View style={styles.ratingInputContainer}>
+                <StarRating
+                  rating={userRating?.rating || 0}
+                  onRatingChange={handleRatingChange}
+                  size="large"
+                  interactive={true}
+                  showText={false}
+                />
+                {userRating && (
+                  <Text style={styles.ratingStatusText}>
+                    Cảm ơn bạn đã đánh giá {userRating.rating} sao!
+                  </Text>
+                )}
+              </View>
+            )}
+          </View>
         </View>
 
       {/* Comments */}
@@ -321,12 +419,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
                     {suggestedBook.authors?.map(author => author.name).join(', ') || 'Unknown Author'}
                   </Text>
                   <Text style={styles.suggestedPrice}>
-                    {suggestedBook.discountPrice 
-                      ? `${suggestedBook.discountPrice.toLocaleString('vi-VN')}đ`
-                      : suggestedBook.price 
-                        ? `${suggestedBook.price.toLocaleString('vi-VN')}đ`
-                        : 'Miễn phí'
-                    }
+                    Đọc miễn phí
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -341,9 +434,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
         <TouchableOpacity style={styles.readButton} onPress={handleReadBook}>
           <Text style={styles.readButtonText}>📖 Đọc sách</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.purchaseButton} onPress={handlePurchase}>
-          <Text style={styles.purchaseButtonText}>💳 Mua sách</Text>
-        </TouchableOpacity>
+        {/* Removed purchase button as this is now a free reading app */}
       </View>
     </SafeAreaView>
   );
@@ -432,9 +523,12 @@ const styles = StyleSheet.create({
     marginBottom: SIZES.spacing.sm,
   },
   ratingContainer: {
+    marginBottom: SIZES.spacing.sm,
+  },
+  ratingSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SIZES.spacing.sm,
+    gap: SIZES.spacing.sm,
   },
   ratingText: {
     fontSize: SIZES.font.sm,
@@ -444,6 +538,66 @@ const styles = StyleSheet.create({
   reviewsText: {
     fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
+  },
+  ratingLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.spacing.sm,
+  },
+  ratingSection: {
+    padding: SIZES.spacing.lg,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    backgroundColor: '#FAFAFA',
+  },
+  currentRatingContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  ratingDisplay: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  ratingCount: {
+    fontSize: SIZES.font.md,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  userRatingContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    marginTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  userRatingTitle: {
+    fontSize: SIZES.font.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  ratingInputContainer: {
+    alignItems: 'center',
+    gap: SIZES.spacing.md,
+  },
+  ratingStatusText: {
+    fontSize: SIZES.font.md,
+    color: '#4CAF50',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: 8,
   },
   categoryContainer: {
     marginBottom: SIZES.spacing.sm,

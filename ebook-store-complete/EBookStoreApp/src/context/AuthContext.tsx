@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useReducer, useEffect, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
-import { apiService, STORAGE_KEYS } from '../services/api';
+import { simpleApiService } from '../services/simpleApi';
+import { STORAGE_KEYS } from '../services/api';
 import { AuthContextType, User, RegisterRequest } from '../types';
 
 interface AuthState {
@@ -152,10 +153,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       dispatch({ type: 'AUTH_LOADING', payload: true });
       
-      const { token, user, refreshToken: storedRefreshToken } = await apiService.getStoredAuthData();
+      // Get stored auth data from AsyncStorage
+      const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+      const userStr = await AsyncStorage.getItem(STORAGE_KEYS.USER);
+      const user = userStr ? JSON.parse(userStr) : null;
+      const storedRefreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
       
       if (token && user) {
         console.log('🔄 Found stored auth data, setting initial state...');
+        
+        // Set token in SimpleApiService
+        simpleApiService.setToken(token);
+        
         // Set initial state with stored data first to avoid loading screen
         dispatch({
           type: 'SET_INITIAL_STATE',
@@ -196,7 +205,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔵 AuthContext.login called with:', { email });
       dispatch({ type: 'AUTH_LOADING', payload: true });
       
-      const response = await apiService.login({ email, password });
+      const response = await simpleApiService.login(email, password);
       console.log('🔵 AuthContext received response:', response);
       console.log('🔵 Response type:', typeof response);
       console.log('🔵 Response.success:', response.success, typeof response.success);
@@ -204,8 +213,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       if (response.success) {
         console.log('🎯 Response validation passed, proceeding with auth save...');
-        await apiService.saveAuthData(response);
+        // Save auth data to AsyncStorage
+        await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.data.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
         console.log('🎯 Auth data saved successfully');
+        
+        // Set token in SimpleApiService
+        simpleApiService.setToken(response.data.token);
         
         dispatch({
           type: 'AUTH_SUCCESS',
@@ -244,10 +259,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const register = async (userData: RegisterRequest): Promise<void> => {
     try {
       dispatch({ type: 'AUTH_LOADING', payload: true });
-      const response = await apiService.register(userData);
+      const response = await simpleApiService.register(userData);
       
       if (response.success) {
-        await apiService.saveAuthData(response);
+        // Save auth data to AsyncStorage
+        await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.data.token);
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
+        
+        // Set token in SimpleApiService
+        simpleApiService.setToken(response.data.token);
+        
         dispatch({
           type: 'AUTH_SUCCESS',
           payload: { user: response.data.user, token: response.data.token },
@@ -279,8 +301,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Stop token refresh interval
       stopTokenRefresh();
       
+      // Clear token from SimpleApiService
+      simpleApiService.setToken(null);
+      
       // Clear auth data (including refresh token)
-      await apiService.logout();
+      await simpleApiService.logout();
       console.log('✅ Auth data cleared successfully');
       
       // Update state
@@ -303,27 +328,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const refreshToken = async (): Promise<void> => {
     try {
       console.log('🔄 Attempting to refresh token...');
-      const { refreshToken: storedRefreshToken } = await apiService.getStoredAuthData();
+      const storedRefreshToken = await AsyncStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
       
       if (!storedRefreshToken) {
         console.log('❌ No refresh token found');
         throw new Error('No refresh token available');
       }
 
-      const response = await apiService.refreshToken({ refreshToken: storedRefreshToken });
+      const response = await simpleApiService.refreshToken(storedRefreshToken);
       
       if (response.success) {
         const updatedUser = state.user;
         if (updatedUser) {
-          await apiService.saveAuthData({
-            success: true,
-            message: 'Token refreshed',
-            data: {
-              user: updatedUser,
-              token: response.data.token,
-              refreshToken: response.data.refreshToken,
-            },
-          });
+          // Save updated auth data to AsyncStorage
+          await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.data.token);
+          await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
+          
+          // Set new token in SimpleApiService
+          simpleApiService.setToken(response.data.token);
+          
           dispatch({
             type: 'AUTH_SUCCESS',
             payload: { user: updatedUser, token: response.data.token },
@@ -336,7 +359,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error: any) {
       console.error('❌ Token refresh failed:', error);
       // Don't call logout here to avoid infinite loop, just clear auth state
-      await apiService.logout();
+      await simpleApiService.logout();
       dispatch({ type: 'AUTH_LOGOUT' });
       throw error;
     }
@@ -348,7 +371,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const forgotPassword = async (email: string): Promise<void> => {
     try {
-      const response = await apiService.forgotPassword({ email });
+      const response = await simpleApiService.forgotPassword(email);
       if (response.success) {
         Toast.show({
           type: 'success',
@@ -371,7 +394,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const resetPassword = async (token: string, password: string): Promise<void> => {
     try {
-      const response = await apiService.resetPassword({ token, password });
+      const response = await simpleApiService.resetPassword(token, password);
       if (response.success) {
         Toast.show({
           type: 'success',
@@ -394,7 +417,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
     try {
-      const response = await apiService.changePassword(currentPassword, newPassword);
+      const response = await simpleApiService.changePassword(currentPassword, newPassword);
       if (response.success) {
         Toast.show({
           type: 'success',
@@ -417,7 +440,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const updateProfile = async (userData: Partial<User>): Promise<void> => {
     try {
-      const response = await apiService.updateProfile(userData);
+      const response = await simpleApiService.updateProfile(userData);
       if (response.success && response.data) {
         dispatch({
           type: 'UPDATE_USER',

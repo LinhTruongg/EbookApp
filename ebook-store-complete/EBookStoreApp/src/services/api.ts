@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { API_CONFIG, API_ENDPOINTS, getApiUrl } from '../constants/api';
+import { API_CONFIG, API_ENDPOINTS, getApiUrl, FALLBACK_URLS } from '../constants/api';
 import {
   ApiResponse,
   AuthResponse,
@@ -20,6 +20,9 @@ import {
   CommentsResponse,
   CreateCommentRequest,
   UserLibaryEntity,
+  Rating,
+  CreateRatingRequest,
+  RatingStats,
 } from '../types';
 
 const STORAGE_KEYS = {
@@ -30,9 +33,15 @@ const STORAGE_KEYS = {
 
 class ApiService {
   private axiosInstance: AxiosInstance;
+  private currentBaseURL: string;
 
   constructor() {
-    const baseURL = `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
+    this.currentBaseURL = API_CONFIG.BASE_URL;
+    this.initializeAxios();
+  }
+
+  private initializeAxios() {
+    const baseURL = `${this.currentBaseURL}${API_CONFIG.API_VERSION}`;
     console.log('🔧 ApiService initialized with baseURL:', baseURL);
     
     this.axiosInstance = axios.create({
@@ -50,6 +59,53 @@ class ApiService {
     });
 
     this.setupInterceptors();
+  }
+
+  private async testUrl(baseUrl: string): Promise<boolean> {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch(`${baseUrl}/health`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch (error) {
+      console.log(`❌ URL ${baseUrl} failed:`, error);
+      return false;
+    }
+  }
+
+  private async findWorkingUrl(): Promise<string | null> {
+    const urlsToTest = [this.currentBaseURL, ...FALLBACK_URLS.filter(url => url !== this.currentBaseURL)];
+    console.log('🔍 Testing URLs:', urlsToTest);
+    
+    for (const url of urlsToTest) {
+      console.log(`🔍 Testing: ${url}`);
+      const isWorking = await this.testUrl(url);
+      if (isWorking) {
+        console.log(`✅ Found working URL: ${url}`);
+        return url;
+      }
+    }
+    
+    console.log('❌ No working URLs found');
+    return null;
+  }
+
+  private async switchToWorkingUrl(): Promise<boolean> {
+    const workingUrl = await this.findWorkingUrl();
+    if (workingUrl && workingUrl !== this.currentBaseURL) {
+      console.log(`🔄 Switching from ${this.currentBaseURL} to ${workingUrl}`);
+      this.currentBaseURL = workingUrl;
+      this.initializeAxios();
+      return true;
+    }
+    return workingUrl !== null;
   }
 
   private setupInterceptors() {
@@ -118,7 +174,7 @@ class ApiService {
 
   async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      console.log('🔵 ApiService.login called with:', { email: data.email, baseURL: API_CONFIG.BASE_URL });
+      console.log('🔵 ApiService.login called with:', { email: data.email, baseURL: this.currentBaseURL });
       const response = await this.axiosInstance.post<AuthResponse>(
         API_ENDPOINTS.AUTH.LOGIN,
         data
@@ -151,6 +207,17 @@ class ApiService {
       return response.data;
     } catch (error: any) {
       console.error('❌ ApiService.login error:', error.response?.data || error.message);
+      
+      // If it's a network error, try to switch to a working URL and retry
+      if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED' || error.message?.includes('Network Error')) {
+        console.log('🔄 Network error detected, trying to find working URL...');
+        const switched = await this.switchToWorkingUrl();
+        if (switched) {
+          console.log('🔄 Retrying login with new URL...');
+          return this.login(data); // Retry with new URL
+        }
+      }
+      
       throw error;
     }
   }
@@ -397,17 +464,18 @@ class ApiService {
 
   async getBooksByCategory(categoryId: string): Promise<ApiResponse<Book[]>> {
     console.log('📂 Fetching books by category:', categoryId);
-    const response = await this.axiosInstance.get(`/books/category/${categoryId}`);
+    const response = await this.axiosInstance.get(`/categories/${categoryId}/books`);
     console.log('✅ Books by category fetched successfully');
     return response.data;
   }
 
-  async getBooksByAuthor(authorId: string): Promise<ApiResponse<Book[]>> {
-    console.log('✍️ Fetching books by author:', authorId);
-    const response = await this.axiosInstance.get(`/books/author/${authorId}`);
-    console.log('✅ Books by author fetched successfully');
-    return response.data;
-  }
+  // Note: getBooksByAuthor endpoint not implemented in backend yet
+  // async getBooksByAuthor(authorId: string): Promise<ApiResponse<Book[]>> {
+  //   console.log('✍️ Fetching books by author:', authorId);
+  //   const response = await this.axiosInstance.get(`/books/author/${authorId}`);
+  //   console.log('✅ Books by author fetched successfully');
+  //   return response.data;
+  // }
 
   async getBookById(bookId: string): Promise<ApiResponse<BookDetailResponse>> {
     console.log('📖 Fetching book details:', bookId);
@@ -668,6 +736,104 @@ class ApiService {
     console.log('💡 Fetching suggested books for:', bookId);
     const response = await this.axiosInstance.get(`/books/${bookId}/suggested?limit=${limit}`);
     console.log('✅ Suggested books fetched successfully');
+    return response.data;
+  }
+
+  // ===== ADMIN DASHBOARD METHODS =====
+
+  async getDashboardStats(): Promise<ApiResponse<{
+    overview: {
+      totalBooks: number;
+      totalUsers: number;
+      totalCategories: number;
+      totalComments: number;
+      totalReviews: number;
+      totalReadingSessions: number;
+    };
+    growth: {
+      newBooksLast30Days: number;
+      newUsersLast30Days: number;
+    };
+    popularBooks: Array<{
+      id: string;
+      title: string;
+      coverImage?: string;
+      readingCount: number;
+    }>;
+    recentActivity: {
+      recentBooks: Array<{
+        id: string;
+        title: string;
+        category?: string;
+        createdAt: string;
+      }>;
+      recentUsers: Array<{
+        id: string;
+        name: string;
+        email: string;
+        createdAt: string;
+      }>;
+    };
+  }>> {
+    console.log('📊 Fetching dashboard statistics...');
+    const response = await this.axiosInstance.get('/admin/dashboard/stats');
+    console.log('✅ Dashboard statistics fetched successfully');
+    return response.data;
+  }
+
+  async getUserGrowthStats(period: '6months' | '12months' | '24months' = '12months'): Promise<ApiResponse<{
+    period: string;
+    totalUsers: number;
+    growthPercentage: number;
+    monthlyData: Array<{
+      month: string;
+      newUsers: number;
+      totalUsers: number;
+    }>;
+    currentMonth: {
+      newUsers: number;
+      totalUsers: number;
+    };
+    previousMonth: {
+      newUsers: number;
+      totalUsers: number;
+    };
+  }>> {
+    console.log('📈 Fetching user growth statistics...');
+    const response = await this.axiosInstance.get(`/admin/dashboard/user-growth?period=${period}`);
+    console.log('✅ User growth statistics fetched successfully');
+    return response.data;
+  }
+
+  // Rating methods
+  async createOrUpdateRating(bookId: string, rating: number): Promise<ApiResponse<Rating>> {
+    console.log('⭐ Creating/updating rating for book:', bookId, 'rating:', rating);
+    const response = await this.axiosInstance.post('/ratings', {
+      bookId,
+      rating
+    });
+    console.log('✅ Rating created/updated successfully');
+    return response.data;
+  }
+
+  async getUserRating(bookId: string): Promise<ApiResponse<Rating | null>> {
+    console.log('⭐ Fetching user rating for book:', bookId);
+    const response = await this.axiosInstance.get(`/ratings/book/${bookId}`);
+    console.log('✅ User rating fetched successfully');
+    return response.data;
+  }
+
+  async getBookRatingStats(bookId: string): Promise<ApiResponse<RatingStats>> {
+    console.log('⭐ Fetching rating statistics for book:', bookId);
+    const response = await this.axiosInstance.get(`/ratings/book/${bookId}/stats`);
+    console.log('✅ Rating statistics fetched successfully');
+    return response.data;
+  }
+
+  async deleteRating(bookId: string): Promise<ApiResponse<void>> {
+    console.log('⭐ Deleting rating for book:', bookId);
+    const response = await this.axiosInstance.delete(`/ratings/book/${bookId}`);
+    console.log('✅ Rating deleted successfully');
     return response.data;
   }
 }

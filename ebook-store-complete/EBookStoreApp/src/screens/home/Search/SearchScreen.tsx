@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants/index';
-import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
 
 interface SearchScreenProps {
   navigation: any;
@@ -38,7 +38,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Adam Khoo',
       coverImage: 'https://via.placeholder.com/150x200/4CAF50/FFFFFF?text=TÔI+TÀI+GIỎI',
       category: 'Self Help',
-      price: 99000,
       rating: 4.5,
       description: 'Cuốn sách về phát triển bản thân và kỹ năng học tập'
     },
@@ -48,7 +47,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Unknown',
       coverImage: 'https://via.placeholder.com/150x200/FFC107/000000?text=NGHỆ+THUẬT',
       category: 'Communication',
-      price: 85000,
       rating: 4.2,
       description: 'Học cách giao tiếp hiệu quả trong công việc và cuộc sống'
     },
@@ -58,7 +56,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Rosie Nguyễn',
       coverImage: 'https://via.placeholder.com/150x200/2196F3/FFFFFF?text=Tuổi+trẻ',
       category: 'Life',
-      price: 120000,
       rating: 4.7,
       description: 'Những bài học quý giá cho tuổi trẻ'
     },
@@ -68,7 +65,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Robert Kiyosaki',
       coverImage: 'https://via.placeholder.com/150x200/9C27B0/FFFFFF?text=RICH+DAD',
       category: 'Finance',
-      price: 150000,
       rating: 4.6,
       description: 'Kiến thức tài chính cơ bản cho mọi người'
     },
@@ -78,7 +74,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Unknown',
       coverImage: 'https://via.placeholder.com/150x200/000000/FFFFFF?text=trên+đường',
       category: 'Travel',
-      price: 75000,
       rating: 4.0,
       description: 'Những chuyến phiêu lưu trên đường'
     },
@@ -88,7 +83,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Dale Carnegie',
       coverImage: 'https://via.placeholder.com/150x200/F44336/FFFFFF?text=ĐẮC+NHÂN+TÂM',
       category: 'Soft Skills',
-      price: 110000,
       rating: 4.8,
       description: 'Nghệ thuật thu phục lòng người'
     },
@@ -98,7 +92,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Unknown',
       coverImage: 'https://via.placeholder.com/150x200/FF9800/FFFFFF?text=Khéo+ăn+nói',
       category: 'Soft Skills',
-      price: 95000,
       rating: 4.3,
       description: 'Kỹ năng giao tiếp và thuyết trình'
     },
@@ -108,7 +101,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Atul Gawande',
       coverImage: 'https://via.placeholder.com/150x200/795548/FFFFFF?text=BEING+MORTAL',
       category: 'Soft Skills',
-      price: 130000,
       rating: 4.4,
       description: 'Về cái chết và y học'
     },
@@ -118,7 +110,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Unknown',
       coverImage: 'https://via.placeholder.com/150x200/FFFFFF/000000?text=Nói+nhiều',
       category: 'Psychology',
-      price: 80000,
       rating: 4.1,
       description: 'Nghệ thuật giao tiếp thông minh'
     },
@@ -128,7 +119,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Daniel Kahneman',
       coverImage: 'https://via.placeholder.com/150x200/FFFFFF/000000?text=TƯ+DUY+NHANH',
       category: 'Psychology',
-      price: 160000,
       rating: 4.9,
       description: 'Hai hệ thống tư duy của con người'
     },
@@ -138,7 +128,6 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       author: 'Adam Khoo',
       coverImage: 'https://via.placeholder.com/150x200/2196F3/FFFFFF?text=LÀM+CHỦ+TƯ+DUY',
       category: 'Psychology',
-      price: 140000,
       rating: 4.6,
       description: 'Phương pháp thay đổi tư duy để thành công'
     }
@@ -166,7 +155,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
     
     try {
       // Use real API for search
-      const response = await apiService.searchBooks(query);
+      const response = await simpleApiService.searchBooks(query);
       
       if (response.success && response.data) {
         let filteredBooks = response.data || [];
@@ -270,7 +259,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         <Text style={styles.searchResultAuthor} numberOfLines={1}>{item.author}</Text>
         <Text style={styles.searchResultCategory}>{item.category}</Text>
         <View style={styles.searchResultFooter}>
-          <Text style={styles.searchResultPrice}>{item.price.toLocaleString('vi-VN')}đ</Text>
+          <Text style={styles.searchResultPrice}>Đọc miễn phí</Text>
           <View style={styles.searchResultRating}>
             <Text style={styles.searchResultRatingText}>⭐ {item.rating}</Text>
           </View>

@@ -1,13 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Dimensions
+  Dimensions,
+  ActivityIndicator,
+  Alert,
+  RefreshControl
 } from 'react-native';
 import { useAuth } from '../../../context/AuthContext';
+import { apiService } from '../../../services/api';
+import UserGrowthChart from '../../../components/admin/UserGrowthChart';
 
 interface AdminDashboardScreenProps {
   navigation?: any;
@@ -16,80 +21,208 @@ interface AdminDashboardScreenProps {
 const { width } = Dimensions.get('window');
 
 const DashboardContent = ({ user }: { user: any }) => {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadDashboardStats = async () => {
+    try {
+      setLoading(true);
+      const response = await apiService.getDashboardStats();
+      if (response.success) {
+        setStats(response.data);
+      } else {
+        Alert.alert('Lỗi', response.message || 'Không thể tải thống kê dashboard');
+      }
+    } catch (error) {
+      console.error('Error loading dashboard stats:', error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi tải thống kê dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadDashboardStats();
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    loadDashboardStats();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Đang tải thống kê...</Text>
+      </View>
+    );
+  }
+
+  if (!stats) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Không thể tải dữ liệu thống kê</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadDashboardStats}>
+          <Text style={styles.retryButtonText}>Thử lại</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   const statsCards = [
-    { title: 'Tổng doanh thu', value: '7,455', trend: '+12%', icon: '🛒', color: '#8B5CF6' },
-    { title: 'Sách mới', value: '946', trend: '-0.5%', icon: '📖', color: '#F59E0B' },
-    { title: 'Người dùng', value: '7,459', trend: '', icon: '👥', color: '#10B981' },
-    { title: 'Đơn hàng', value: '5,166', trend: '+1.5%', icon: '📦', color: '#EF4444' },
+    { 
+      title: 'Tổng số sách', 
+      value: stats.overview.totalBooks.toLocaleString(), 
+      trend: `+${stats.growth.newBooksLast30Days}`, 
+      icon: '📚', 
+      color: '#3B82F6' 
+    },
+    { 
+      title: 'Tổng người dùng', 
+      value: stats.overview.totalUsers.toLocaleString(), 
+      trend: `+${stats.growth.newUsersLast30Days}`, 
+      icon: '👥', 
+      color: '#10B981' 
+    },
+    { 
+      title: 'Danh mục', 
+      value: stats.overview.totalCategories.toLocaleString(), 
+      trend: '', 
+      icon: '📂', 
+      color: '#F59E0B' 
+    },
+    { 
+      title: 'Phiên đọc', 
+      value: stats.overview.totalReadingSessions.toLocaleString(), 
+      trend: '', 
+      icon: '📖', 
+      color: '#8B5CF6' 
+    },
   ];
 
-  const quickActions = [
-    { title: 'Thêm sách', icon: '📚', action: 'add-book' },
-    { title: 'Quản lý người dùng', icon: '👥', action: 'manage-users' },
-    { title: 'Thêm chủ đề', icon: '📂', action: 'add-category' },
-    { title: 'Xem báo cáo', icon: '📊', action: 'view-reports' },
-  ];
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) return 'Vừa xong';
+    if (diffInHours < 24) return `${diffInHours} giờ trước`;
+    const diffInDays = Math.floor(diffInHours / 24);
+    if (diffInDays < 7) return `${diffInDays} ngày trước`;
+    return date.toLocaleDateString('vi-VN');
+  };
 
   const recentActivities = [
-    { title: 'Sách mới được thêm', description: 'Harry Potter và Hòn đá Phù thủy', time: '2 giờ trước', icon: '📚' },
-    { title: 'Người dùng mới đăng ký', description: 'Nguyễn Văn A đã tạo tài khoản', time: '4 giờ trước', icon: '👤' },
-    { title: 'Đơn hàng mới', description: 'Đơn hàng #1234 - 250,000 VNĐ', time: '6 giờ trước', icon: '🛒' },
-    { title: 'Đánh giá mới', description: '5 sao cho cuốn "Dế Mèn Phiêu Lưu Ký"', time: '8 giờ trước', icon: '⭐' },
+    ...stats.recentActivity.recentBooks.slice(0, 2).map((book: any) => ({
+      title: 'Sách mới được thêm',
+      description: book.title,
+      time: formatTimeAgo(book.createdAt),
+      icon: '📚'
+    })),
+    ...stats.recentActivity.recentUsers.slice(0, 2).map((user: any) => ({
+      title: 'Người dùng mới đăng ký',
+      description: user.name,
+      time: formatTimeAgo(user.createdAt),
+      icon: '👤'
+    }))
   ];
 
   return (
-    <ScrollView style={styles.dashboardContent}>
-      {/* Stats Cards */}
-      <View style={styles.statsGrid}>
-        {statsCards.map((card, index) => (
-          <View key={index} style={styles.statCard}>
-            <View style={styles.statCardHeader}>
-              <View style={[styles.statIcon, { backgroundColor: card.color }]}>
-                <Text style={styles.statIconText}>{card.icon}</Text>
-              </View>
-              {card.trend && (
-                <View style={[
-                  styles.trendBadge,
-                  card.trend.startsWith('+') ? styles.positiveTrend : styles.negativeTrend
-                ]}>
-                  <Text style={styles.trendText}>{card.trend}</Text>
-                </View>
-              )}
-            </View>
-            <Text style={styles.statValue}>{card.value}</Text>
-            <Text style={styles.statTitle}>{card.title}</Text>
-          </View>
-        ))}
-      </View>
+    <ScrollView 
+      style={styles.dashboardContent}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      showsVerticalScrollIndicator={false}
+    >
 
-      {/* Quick Actions */}
-      <View style={styles.quickActions}>
-        <Text style={styles.quickActionsTitle}>Thao tác nhanh</Text>
-        <View style={styles.quickActionsGrid}>
-          {quickActions.map((action, index) => (
-            <TouchableOpacity key={index} style={styles.quickActionButton}>
-              <Text style={styles.quickActionIcon}>{action.icon}</Text>
-              <Text style={styles.quickActionText}>{action.title}</Text>
-            </TouchableOpacity>
+      {/* Main Stats Grid - 2x2 Layout */}
+      <View style={styles.statsContainer}>
+        {/* Left Column - 2 items */}
+        <View style={styles.statsLeftColumn}>
+          {statsCards.slice(0, 2).map((card, index) => (
+            <View key={index} style={styles.statCard}>
+              <View style={styles.statCardContent}>
+                <View style={styles.statCardLeft}>
+                  <View style={[styles.statIcon, { backgroundColor: card.color }]}>
+                    <Text style={styles.statIconText}>{card.icon}</Text>
+                  </View>
+                  <View style={styles.statCardInfo}>
+                    <Text style={styles.statValue}>{card.value}</Text>
+                    <Text style={styles.statTitle}>{card.title}</Text>
+                  </View>
+                </View>
+                {card.trend && (
+                  <View style={[
+                    styles.trendBadge,
+                    card.trend.startsWith('+') ? styles.positiveTrend : styles.negativeTrend
+                  ]}>
+                    <Text style={styles.trendText}>{card.trend}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Right Column - 2 items */}
+        <View style={styles.statsRightColumn}>
+          {statsCards.slice(2, 4).map((card, index) => (
+            <View key={index + 2} style={styles.statCard}>
+              <View style={styles.statCardContent}>
+                <View style={styles.statCardLeft}>
+                  <View style={[styles.statIcon, { backgroundColor: card.color }]}>
+                    <Text style={styles.statIconText}>{card.icon}</Text>
+                  </View>
+                  <View style={styles.statCardInfo}>
+                    <Text style={styles.statValue}>{card.value}</Text>
+                    <Text style={styles.statTitle}>{card.title}</Text>
+                  </View>
+                </View>
+                {card.trend && (
+                  <View style={[
+                    styles.trendBadge,
+                    card.trend.startsWith('+') ? styles.positiveTrend : styles.negativeTrend
+                  ]}>
+                    <Text style={styles.trendText}>{card.trend}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
           ))}
         </View>
       </View>
 
-      {/* Recent Activity */}
-      <View style={styles.recentActivity}>
-        <Text style={styles.recentActivityTitle}>Hoạt động gần đây</Text>
-        {recentActivities.map((activity, index) => (
-          <View key={index} style={styles.activityItem}>
-            <View style={styles.activityIcon}>
-              <Text style={styles.activityIconText}>{activity.icon}</Text>
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityTitle}>{activity.title}</Text>
-              <Text style={styles.activityDescription}>{activity.description}</Text>
-              <Text style={styles.activityTime}>{activity.time}</Text>
-            </View>
+      {/* User Growth Chart - Full Width */}
+      <View style={styles.chartSection}>
+        <UserGrowthChart />
+      </View>
+
+      {/* Recent Activity - Bottom Section */}
+      <View style={styles.recentActivitySection}>
+        <View style={styles.compactRecentActivity}>
+          <Text style={styles.sectionTitle}>Hoạt động gần đây</Text>
+          <View style={styles.compactActivityList}>
+            {recentActivities.slice(0, 3).map((activity, index) => (
+              <View key={index} style={styles.compactActivityItem}>
+                <View style={styles.compactActivityIcon}>
+                  <Text style={styles.compactActivityIconText}>{activity.icon}</Text>
+                </View>
+                <View style={styles.compactActivityContent}>
+                  <Text style={styles.compactActivityTitle}>{activity.title}</Text>
+                  <Text style={styles.compactActivityDescription} numberOfLines={1}>
+                    {activity.description}
+                  </Text>
+                  <Text style={styles.compactActivityTime}>{activity.time}</Text>
+                </View>
+              </View>
+            ))}
           </View>
-        ))}
+        </View>
       </View>
     </ScrollView>
   );
@@ -106,16 +239,97 @@ const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = ({ navigation 
 const styles = StyleSheet.create({
   dashboardContent: {
     flex: 1,
-    padding: 24,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: '#F8FAFC',
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  statsContainer: {
+    flexDirection: width > 768 ? 'row' : 'column',
     marginBottom: 24,
     gap: 16,
   },
+  statsLeftColumn: {
+    flex: 1,
+    gap: 16,
+  },
+  statsRightColumn: {
+    flex: 1,
+    gap: 16,
+  },
   statCard: {
-    width: (width - 72) / 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  statCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  statCardLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  statIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  statIconText: {
+    fontSize: 18,
+    color: '#FFFFFF',
+  },
+  statCardInfo: {
+    flex: 1,
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginBottom: 2,
+  },
+  statTitle: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '500',
+  },
+  trendBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  trendText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  chartSection: {
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  recentActivitySection: {
+    marginTop: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 12,
+  },
+  compactRecentActivity: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
@@ -124,9 +338,47 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
     elevation: 3,
+  },
+  compactActivityList: {
+    gap: 8,
+  },
+  compactActivityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  compactActivityIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  compactActivityIconText: {
+    fontSize: 12,
+  },
+  compactActivityContent: {
+    flex: 1,
+  },
+  compactActivityTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 2,
+  },
+  compactActivityDescription: {
+    fontSize: 10,
+    color: '#64748B',
+    marginBottom: 2,
+  },
+  compactActivityTime: {
+    fontSize: 10,
+    color: '#94A3B8',
   },
   statCardHeader: {
     flexDirection: 'row',
@@ -134,41 +386,11 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 12,
   },
-  statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  statIconText: {
-    fontSize: 20,
-  },
-  trendBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
   positiveTrend: {
     backgroundColor: '#DCFCE7',
   },
   negativeTrend: {
     backgroundColor: '#FEE2E2',
-  },
-  trendText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 4,
-  },
-  statTitle: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
   },
   quickActions: {
     marginBottom: 24,
@@ -264,6 +486,40 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 12,
     color: '#94A3B8',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#64748B',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

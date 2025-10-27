@@ -13,7 +13,7 @@ import {
 import Toast from 'react-native-toast-message';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
-import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
 import { Category } from '../../../types';
 
 // Extended Category interface for UI purposes
@@ -55,11 +55,11 @@ const CategoriesScreen: React.FC = () => {
   const loadCategories = async () => {
     try {
       setIsLoading(true);
-      const response = await apiService.getCategories();
+      const response = await simpleApiService.getCategories();
       
       if (response.success && response.data) {
         // Map API categories to UI categories with colors and icons
-        const categoriesWithUI: CategoryWithUI[] = response.data.map((category, index) => ({
+        const categoriesWithUI: CategoryWithUI[] = response.data.map((category: any, index: number) => ({
           ...category,
           backgroundColor: categoryStyles[index % categoryStyles.length].backgroundColor,
         }));

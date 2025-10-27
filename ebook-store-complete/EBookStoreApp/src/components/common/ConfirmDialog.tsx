@@ -74,6 +74,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       transparent
       animationType="fade"
       statusBarTranslucent
+      accessibilityViewIsModal={true}
+      accessibilityLabel="Dialog xác nhận"
     >
       <View style={styles.overlay}>
         <View style={styles.dialogContainer}>
@@ -95,6 +97,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={[styles.button, styles.cancelButton]}
                 onPress={onCancel}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Hủy ${title}`}
               >
                 <Text style={styles.cancelButtonText}>{cancelText}</Text>
               </TouchableOpacity>
@@ -107,6 +111,8 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 ]}
                 onPress={onConfirm}
                 activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Xác nhận ${title}`}
               >
                 <Text style={styles.confirmButtonText}>{confirmText}</Text>
               </TouchableOpacity>

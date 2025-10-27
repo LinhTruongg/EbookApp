@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { simpleApiService } from '../../services/simpleApi';
 import { COLORS, SIZES, COMMON_STYLES } from '../../constants';
 import { useRouter } from 'expo-router';
 
@@ -29,7 +30,7 @@ const LoginForm: React.FC = () => {
     }
 
     try {
-      console.log('🔵 LoginForm calling login...');
+      console.log('🔵 LoginForm calling login from AuthContext...');
       const loggedInUser = await login(email, password);
       
       // Check user role and navigate accordingly
@@ -40,9 +41,28 @@ const LoginForm: React.FC = () => {
         router.push('/(tabs)');
         console.log('✅ User login successful - redirected to user tabs');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ LoginForm login error:', error);
-      Alert.alert('Login Failed', `Error: ${error instanceof Error ? error.message : 'Invalid email or password'}`);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        config: error.config?.url,
+        code: error.code
+      });
+      
+      let errorMessage = 'Invalid email or password';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      } else if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
+        errorMessage = 'Cannot connect to server. Please check your internet connection.';
+      }
+      
+      Alert.alert('Login Failed', errorMessage);
     }
   };
 

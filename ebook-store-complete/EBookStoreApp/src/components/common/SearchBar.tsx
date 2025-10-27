@@ -50,7 +50,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       const response = await apiService.searchBooks(query);
       
       if (response.success && response.data) {
-        setSearchResults(response.data.books || []);
+        setSearchResults(response.data || []);
         
         // Add to search history
         if (showHistory && !searchHistory.includes(query.trim())) {
@@ -79,7 +79,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
       // Debounce search to avoid too many API calls
       searchTimeoutRef.current = setTimeout(() => {
         performSearch(query);
-      }, 300);
+      }, 300) as any;
     } else {
       setSearchResults([]);
     }
@@ -136,10 +136,8 @@ const SearchBar: React.FC<SearchBarProps> = ({
         </Text>
         <Text style={styles.searchResultCategory}>{item.category?.name || 'Không phân loại'}</Text>
         <View style={styles.searchResultFooter}>
-          <Text style={styles.searchResultPrice}>
-            {item.price ? `${parseFloat(item.price).toLocaleString('vi-VN')}đ` : 'Miễn phí'}
-          </Text>
-          {item.rating && parseFloat(item.rating) > 0 && (
+          
+          {item.rating && parseFloat(item.rating.toString()) > 0 && (
             <Text style={styles.searchResultRating}>⭐ {item.rating}</Text>
           )}
         </View>

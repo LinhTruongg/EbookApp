@@ -28,11 +28,13 @@ interface ManageUsersScreenProps {
 
 const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation }) => {
   const [users, setUsers] = useState<User[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchType, setSearchType] = useState<'user' | 'book'>('user');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -69,10 +71,24 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
     }
   }, [route?.params?.editUser]);
 
+  useEffect(() => {
+    loadUsers();
+  }, [searchQuery, searchType]);
+
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await apiService.getAllUsersAdmin();
+      const searchParams: any = {};
+      
+      if (searchQuery.trim()) {
+        if (searchType === 'book') {
+          searchParams.bookTitle = searchQuery.trim();
+        } else {
+          searchParams.search = searchQuery.trim();
+        }
+      }
+      
+      const response = await apiService.getAllUsersAdmin(searchParams);
       if (response.success) {
         setUsers(response.data || []);
       } else {
@@ -90,6 +106,14 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
     setRefreshing(true);
     await loadUsers();
     setRefreshing(false);
+  };
+
+  const filterUsers = () => {
+    setFilteredUsers(users);
+  };
+
+  const handleSearchChange = (text: string) => {
+    setSearchQuery(text);
   };
 
   const resetForm = () => {
@@ -136,7 +160,7 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
       };
 
       if (editingUser) {
-        const response = await apiService.updateUser(editingUser.id, submitData);
+        const response = await apiService.updateUser(editingUser.id.toString(), submitData);
         if (response.success) {
           Alert.alert('Thành công', 'Cập nhật người dùng thành công');
           setModalVisible(false);
@@ -173,7 +197,7 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
           style: 'destructive',
           onPress: async () => {
             try {
-              const response = await apiService.deleteUser(user.id);
+              const response = await apiService.deleteUser(user.id.toString());
               if (response.success) {
                 Alert.alert('Thành công', response.message || 'Xóa người dùng thành công');
                 loadUsers();
@@ -204,7 +228,7 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
               return;
             }
             try {
-              const response = await apiService.resetUserPassword(user.id, newPassword.trim());
+              const response = await apiService.resetUserPassword(user.id.toString(), newPassword.trim());
               if (response.success) {
                 Alert.alert('Thành công', 'Đặt lại mật khẩu thành công');
               } else {
@@ -221,12 +245,6 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
     );
   };
 
-  const filteredUsers = users.filter(user =>
-    user.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.phone?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   const renderUserItem = ({ item }: { item: User }) => (
     <View style={styles.userItem}>
@@ -235,20 +253,12 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
         <Text style={styles.userEmail}>{item.email}</Text>
         <Text style={styles.userPhone}>{item.phone || 'Chưa có SĐT'}</Text>
         <View style={styles.userMeta}>
+          <Text style={[styles.statusBadge, item.isActive ? styles.activeBadge : styles.inactiveBadge]}>
+            {item.isActive ? 'Hoạt động' : 'Không hoạt động'}
+          </Text>
           <Text style={styles.userRole}>
             {item.role === 'admin' ? '👑 Admin' : '👤 User'}
           </Text>
-          <View style={[
-            styles.statusBadge,
-            item.isActive ? styles.activeBadge : styles.inactiveBadge
-          ]}>
-            <Text style={[
-              styles.statusText,
-              item.isActive ? styles.activeText : styles.inactiveText
-            ]}>
-              {item.isActive ? 'Hoạt động' : 'Tạm dừng'}
-            </Text>
-          </View>
           {item.isVerified && <Text style={styles.verifiedBadge}>✅ Đã xác thực</Text>}
         </View>
       </View>
@@ -273,19 +283,13 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
             setModalVisible(true);
           }}
         >
-          <Text style={styles.editButtonText}>✏️</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.resetButton}
-          onPress={() => handleResetPassword(item)}
-        >
-          <Text style={styles.resetButtonText}>🔑</Text>
+          <Text style={styles.editButtonText}>Sửa</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDelete(item)}
         >
-          <Text style={styles.deleteButtonText}>🗑️</Text>
+          <Text style={styles.deleteButtonText}>Xóa</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -304,7 +308,33 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Quản lý người dùng</Text>
+        <View style={styles.searchContainer}>
+          <View style={styles.searchTypeContainer}>
+            <TouchableOpacity
+              style={[styles.searchTypeButton, searchType === 'user' && styles.activeSearchType]}
+              onPress={() => setSearchType('user')}
+            >
+              <Text style={[styles.searchTypeText, searchType === 'user' && styles.activeSearchTypeText]}>
+                Tìm theo người dùng
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.searchTypeButton, searchType === 'book' && styles.activeSearchType]}
+              onPress={() => setSearchType('book')}
+            >
+              <Text style={[styles.searchTypeText, searchType === 'book' && styles.activeSearchTypeText]}>
+                Tìm theo tên sách
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={styles.searchInput}
+            placeholder={searchType === 'book' ? "Tìm kiếm theo tên sách..." : "Tìm kiếm người dùng..."}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholderTextColor="#999"
+          />
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => {
@@ -316,27 +346,19 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
         </TouchableOpacity>
       </View>
 
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Tìm kiếm người dùng..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
-
       <FlatList
         data={filteredUsers}
         renderItem={renderUserItem}
-        keyExtractor={(item) => item.id}
-        style={styles.usersList}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>👥 Chưa có người dùng nào</Text>
-            <Text style={styles.emptySubtext}>Hãy thêm người dùng đầu tiên của bạn</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? 'Không tìm thấy người dùng nào' : 'Chưa có người dùng nào'}
+            </Text>
           </View>
         }
       />
@@ -545,54 +567,80 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1E293B',
-  },
-  addButton: {
-    backgroundColor: '#3B82F6',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
+    borderBottomColor: '#e0e0e0',
+    gap: 12,
   },
   searchContainer: {
-    padding: 20,
-    backgroundColor: '#FFFFFF',
+    flex: 1,
+  },
+  searchTypeContainer: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    padding: 2,
+  },
+  searchTypeButton: {
+    flex: 1,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  activeSearchType: {
+    backgroundColor: '#007AFF',
+  },
+  searchTypeText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeSearchTypeText: {
+    color: '#fff',
   },
   searchInput: {
     borderWidth: 1,
-    borderColor: '#D1D5DB',
+    borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     fontSize: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f9f9f9',
+    height: 40,
   },
-  usersList: {
-    flex: 1,
-    padding: 20,
+  addButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  listContainer: {
+    padding: 16,
   },
   userItem: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    backgroundColor: '#fff',
     padding: 16,
     marginBottom: 12,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -605,101 +653,89 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
-    marginBottom: 4,
+    color: '#333',
   },
   userEmail: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
   userPhone: {
-    fontSize: 12,
-    color: '#64748B',
-    marginBottom: 8,
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
   userMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  userRole: {
-    fontSize: 12,
-    color: '#6366F1',
-    fontWeight: '600',
+    marginTop: 8,
   },
   statusBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
+    marginRight: 8,
   },
   activeBadge: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: '#d4edda',
+    color: '#155724',
   },
   inactiveBadge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: '#f8d7da',
+    color: '#721c24',
   },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  activeText: {
-    color: '#065F46',
-  },
-  inactiveText: {
-    color: '#991B1B',
+  userRole: {
+    fontSize: 12,
+    color: '#666',
+    marginRight: 8,
   },
   verifiedBadge: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#059669',
     fontWeight: '600',
   },
   userActions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
   },
   editButton: {
     backgroundColor: '#3B82F6',
-    padding: 8,
-    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    minWidth: 60,
   },
   editButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-  },
-  resetButton: {
-    backgroundColor: '#F59E0B',
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  resetButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#EF4444',
-    padding: 8,
-    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
     alignItems: 'center',
+    minWidth: 60,
   },
   deleteButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    paddingVertical: 50,
   },
   emptyText: {
-    fontSize: 18,
-    color: '#64748B',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#94A3B8',
+    fontSize: 16,
+    color: '#666',
   },
   loadingContainer: {
     flex: 1,
@@ -840,5 +876,3 @@ const styles = StyleSheet.create({
 });
 
 export default ManageUsersScreen;
-
-

@@ -14,7 +14,7 @@ class UserController {
           {
             model: UserLibrary,
             as: 'library',
-            attributes: ['bookId', 'purchaseDate', 'readingProgress', 'isFavorite'],
+            attributes: ['bookId', 'addedDate', 'readingProgress', 'isFavorite'],
             limit: 5,
             order: [['lastReadAt', 'DESC']]
           }
@@ -117,7 +117,7 @@ class UserController {
         page = 1,
         limit = 12,
         filter = 'all',
-        sortBy = 'purchaseDate',
+        sortBy = 'addedDate',
         sortOrder = 'DESC'
       } = req.query;
 
@@ -192,7 +192,6 @@ class UserController {
         include: [{
           model: Book,
           as: 'book',
-          where: { status: 'active' },
           include: [
             {
               model: Category,
@@ -206,7 +205,7 @@ class UserController {
             }
           ]
         }],
-        order: [['lastReadAt', 'DESC'], ['purchaseDate', 'DESC']]
+        order: [['lastReadAt', 'DESC'], ['addedDate', 'DESC']]
       });
 
       // Categorize books by reading status
@@ -226,7 +225,7 @@ class UserController {
           lastReadAt: libraryBook.lastReadAt,
           isFavorite: libraryBook.isFavorite,
           readingTimeMinutes: libraryBook.readingTimeMinutes,
-          purchaseDate: libraryBook.purchaseDate,
+          addedDate: libraryBook.addedDate,
           accessType: libraryBook.accessType,
           notes: libraryBook.notes
         };
@@ -287,7 +286,6 @@ class UserController {
         include: [{
           model: Book,
           as: 'book',
-          where: { status: 'active' },
           include: [
             {
               model: Category,
@@ -390,7 +388,7 @@ class UserController {
       const readingBooks = library.filter(entry => entry.readingProgress > 0 && entry.readingProgress < 100).length;
       const favoriteBooks = library.filter(entry => entry.isFavorite).length;
       const totalReadingTime = library.reduce((sum, entry) => sum + (entry.readingTimeMinutes || 0), 0);
-      const totalSpent = library.reduce((sum, entry) => sum + parseFloat(entry.pricePaid || 0), 0);
+      // Removed totalSpent calculation as this is now a free reading app
 
       return {
         totalBooks,
@@ -420,6 +418,7 @@ class UserController {
         role,
         isActive,
         search,
+        bookTitle,
         sortBy = 'createdAt',
         sortOrder = 'DESC'
       } = req.query;
@@ -445,12 +444,37 @@ class UserController {
         ];
       }
 
+      // If searching by book title, we need to join with UserLibrary and Book tables
+      let includeOptions = [];
+      if (bookTitle) {
+        includeOptions = [
+          {
+            model: UserLibrary,
+            as: 'library',
+            attributes: [],
+            include: [
+              {
+                model: Book,
+                as: 'book',
+                attributes: [],
+                where: {
+                  title: { [Op.like]: `%${bookTitle}%` }
+                }
+              }
+            ],
+            required: true // INNER JOIN to only get users who have books with matching titles
+          }
+        ];
+      }
+
       const users = await User.findAndCountAll({
         where: whereClause,
         attributes: { exclude: ['password', 'verificationToken', 'resetPasswordToken'] },
+        include: includeOptions,
         order: [[sortBy, sortOrder.toUpperCase()]],
         limit: parseInt(limit),
-        offset: parseInt(offset)
+        offset: parseInt(offset),
+        distinct: true // Important when using joins
       });
 
       res.json({
@@ -485,7 +509,7 @@ class UserController {
           {
             model: UserLibrary,
             as: 'library',
-            attributes: ['bookId', 'purchaseDate', 'readingProgress', 'isFavorite'],
+            attributes: ['bookId', 'addedDate', 'readingProgress', 'isFavorite'],
             limit: 10,
             order: [['lastReadAt', 'DESC']]
           }
@@ -670,7 +694,7 @@ class UserController {
         });
       }
 
-      // Check if user has any purchases or reviews
+      // Check if user has any library entries or reviews
       const hasLibrary = await UserLibrary.findOne({ where: { userId: id } });
       const hasWishlist = await Wishlist.findOne({ where: { userId: id } });
       const hasBookmarks = await Bookmark.findOne({ where: { userId: id } });

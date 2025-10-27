@@ -49,8 +49,6 @@ class CategoryController {
         limit = 12,
         sortBy = 'createdAt',
         sortOrder = 'DESC',
-        minPrice,
-        maxPrice
       } = req.query;
 
       const category = await Category.findByPk(id, {
@@ -71,11 +69,7 @@ class CategoryController {
         category_id: { [Op.in]: categoryIds }
       };
 
-      if (minPrice || maxPrice) {
-        whereClause.price = {};
-        if (minPrice) whereClause.price[Op.gte] = parseFloat(minPrice);
-        if (maxPrice) whereClause.price[Op.lte] = parseFloat(maxPrice);
-      }
+      // Removed price filtering as this is now a free reading app
 
       // Use raw query to avoid Sequelize issues with non-existent columns
       const { count, rows: books } = await Book.findAndCountAll({
@@ -124,26 +118,89 @@ class CategoryController {
     }
   }
 
+  // Debug endpoint to check database state
+  async debugDatabase(req, res) {
+    try {
+      const totalBooks = await Book.count();
+      const totalCategories = await Category.count();
+      
+      // Get some sample books with their categories
+      const sampleBooks = await Book.findAll({
+        limit: 5,
+        include: [{
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name']
+        }],
+        attributes: ['id', 'title', 'categoryId']
+      });
+      
+      res.json({
+        success: true,
+        data: {
+          totalBooks,
+          totalCategories,
+          sampleBooks
+        }
+      });
+    } catch (error) {
+      console.error('Debug database error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Debug error',
+        error: error.message
+      });
+    }
+  }
+
   // Get all categories for admin (including inactive)
   async getAllCategories(req, res) {
     try {
       const categories = await Category.findAll({
-        attributes: ['id', 'name', 'slug', 'description', 'isActive', 'sortOrder', 'createdAt', 'updatedAt'],
+        attributes: ['id', 'name', 'slug', 'description', 'isActive', 'sortOrder', 'parentId', 'createdAt', 'updatedAt'],
         order: [['sortOrder', 'ASC'], ['name', 'ASC']]
       });
 
-      const transformed = categories.map(category => ({
-        id: category.id.toString(),
-        name: category.name,
-        slug: category.slug,
-        description: category.description,
-        icon: 'book',
-        booksCount: category.booksCount || 0,
-        isActive: category.isActive,
-        sortOrder: category.sortOrder || 0,
-        parentId: category.parentId || null,
-        createdAt: category.createdAt,
-        updatedAt: category.updatedAt
+      // Calculate book count for each category
+      const transformed = await Promise.all(categories.map(async (category) => {
+        try {
+          const booksCount = await category.countBooks();
+          console.log(`Category ${category.name} (ID: ${category.id}) has ${booksCount} books`);
+          
+          // Debug: Let's also check if there are any books in the database at all
+          const { Book } = require('../models');
+          const totalBooks = await Book.count();
+          console.log(`Total books in database: ${totalBooks}`);
+          
+          return {
+            id: category.id.toString(),
+            name: category.name,
+            slug: category.slug,
+            description: category.description,
+            icon: 'book',
+            booksCount: booksCount,
+            isActive: category.isActive,
+            sortOrder: category.sortOrder || 0,
+            parentId: category.parentId || null,
+            createdAt: category.createdAt,
+            updatedAt: category.updatedAt
+          };
+        } catch (error) {
+          console.error(`Error counting books for category ${category.name}:`, error);
+          return {
+            id: category.id.toString(),
+            name: category.name,
+            slug: category.slug,
+            description: category.description,
+            icon: 'book',
+            booksCount: 0,
+            isActive: category.isActive,
+            sortOrder: category.sortOrder || 0,
+            parentId: category.parentId || null,
+            createdAt: category.createdAt,
+            updatedAt: category.updatedAt
+          };
+        }
       }));
 
       res.json({

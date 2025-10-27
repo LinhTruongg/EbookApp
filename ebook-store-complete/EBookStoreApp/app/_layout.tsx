@@ -5,6 +5,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { AuthProvider } from '../src/context/AuthContext';
 
+// Suppress React Native Web warnings
+import '../src/utils/suppressWarnings';
+
 // Create a client
 const queryClient = new QueryClient({
   defaultOptions: {

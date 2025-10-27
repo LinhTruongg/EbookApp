@@ -12,6 +12,7 @@ export default function ProfileLayout() {
           headerStyle: { backgroundColor: COLORS.primary },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
+          headerTitleAlign: 'center',
         }}
       />
       <Stack.Screen
@@ -21,6 +22,7 @@ export default function ProfileLayout() {
           headerStyle: { backgroundColor: COLORS.primary },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
+          headerTitleAlign: 'center',
         }}
       />
       <Stack.Screen
@@ -30,6 +32,7 @@ export default function ProfileLayout() {
           headerStyle: { backgroundColor: COLORS.primary },
           headerTintColor: '#fff',
           headerTitleStyle: { fontWeight: 'bold' },
+          headerTitleAlign: 'center',
         }}
       />
     </Stack>

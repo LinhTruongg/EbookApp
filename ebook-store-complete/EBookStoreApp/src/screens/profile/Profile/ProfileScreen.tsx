@@ -174,14 +174,14 @@ function ProfileScreen() {
         
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Text style={styles.statNumber}>{user.booksPurchased}</Text>
-            <Text style={styles.statLabel}>Sách đã mua</Text>
+            <Text style={styles.statNumber}>{user.booksRead || 0}</Text>
+            <Text style={styles.statLabel}>Sách đã đọc</Text>
           </View>
           <View style={styles.statItem}>
             <Text style={styles.statNumber}>
-              {user.totalSpent.toLocaleString('vi-VN')}đ
+              Đọc miễn phí
             </Text>
-            <Text style={styles.statLabel}>Tổng chi tiêu</Text>
+            <Text style={styles.statLabel}>Tất cả sách</Text>
           </View>
         </View>
 
@@ -380,7 +380,7 @@ function ProfileScreen() {
         message="Bạn có chắc chắn muốn đăng xuất?"
         confirmText="Đăng xuất"
         cancelText="Hủy"
-        destructive
+        type="danger"
         onConfirm={confirmLogout}
         onCancel={() => setShowLogoutConfirm(false)}
       />
@@ -391,7 +391,7 @@ function ProfileScreen() {
         message="Bạn có chắc chắn muốn xóa ảnh đại diện hiện tại?"
         confirmText="Xóa"
         cancelText="Hủy"
-        destructive
+        type="danger"
         onConfirm={confirmRemoveAvatar}
         onCancel={() => setShowRemoveAvatarConfirm(false)}
       />

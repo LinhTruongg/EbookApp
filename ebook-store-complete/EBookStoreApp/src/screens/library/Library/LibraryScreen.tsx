@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
-import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
 import { Book } from '../../../types';
 import { eventBus } from '../../../utils/eventBus';
 
@@ -77,8 +77,8 @@ const LibraryScreen: React.FC = () => {
     try {
       setLoading(true);
       const [libRes, wishRes] = await Promise.all([
-        apiService.getUserLibraryCategorized(),
-        apiService.getUserWishlist().catch(() => ({ success: false }))
+        simpleApiService.getUserLibrary(),
+        simpleApiService.getUserWishlist().catch(() => ({ success: false }))
       ]);
 
       if (libRes.success && libRes.data) {

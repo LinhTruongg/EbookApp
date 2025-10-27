@@ -33,10 +33,9 @@ const categoryRoutes = require('./routes/categories');
 const authorRoutes = require('./routes/authors');
 const reviewRoutes = require('./routes/reviews');
 const commentRoutes = require('./routes/comments');
-const orderRoutes = require('./routes/orders');
+const ratingRoutes = require('./routes/ratings');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
-const stripeRoutes = require('./routes/stripe');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -132,10 +131,9 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/authors', authorRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/comments', commentRoutes);
-app.use('/api/orders', orderRoutes);
+app.use('/api/ratings', ratingRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
-app.use('/api/stripe', stripeRoutes);
 
 // API Documentation
 const swaggerJsdoc = require('swagger-jsdoc');

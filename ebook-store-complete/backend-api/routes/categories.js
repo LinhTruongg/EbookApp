@@ -23,6 +23,15 @@ router.get('/all', authenticateToken, categoryController.getAllCategories);
 
 /**
  * @swagger
+ * /api/categories/debug:
+ *   get:
+ *     tags: [Categories]
+ *     summary: Debug database state
+ */
+router.get('/debug', categoryController.debugDatabase);
+
+/**
+ * @swagger
  * /api/categories/{id}/books:
  *   get:
  *     tags: [Categories]

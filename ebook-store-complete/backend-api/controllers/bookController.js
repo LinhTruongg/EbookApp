@@ -10,28 +10,21 @@ class BookController {
         page = 1,
         limit = 12,
         category,
-        minPrice,
-        maxPrice,
         rating,
         sortBy = 'createdAt',
         sortOrder = 'DESC',
-        search,
-        status = 'active'
+        search
       } = req.query;
 
       const offset = (page - 1) * limit;
-      const whereClause = { status };
+      const whereClause = {};
 
       // Apply filters
       if (category) {
         whereClause.categoryId = category;
       }
 
-      if (minPrice || maxPrice) {
-        whereClause.price = {};
-        if (minPrice) whereClause.price[Op.gte] = parseFloat(minPrice);
-        if (maxPrice) whereClause.price[Op.lte] = parseFloat(maxPrice);
-      }
+      // Removed price filtering as this is now a free reading app
 
       if (rating) {
         whereClause.rating = { [Op.gte]: parseFloat(rating) };
@@ -141,7 +134,7 @@ class BookController {
         const [userLibrary, wishlist] = await Promise.all([
           UserLibrary.findOne({
             where: { userId, bookId: id },
-            attributes: ['readingProgress', 'currentPage', 'isFavorite', 'purchaseDate']
+            attributes: ['readingProgress', 'currentPage', 'isFavorite', 'addedDate']
           }),
           Wishlist.findOne({
             where: { userId, bookId: id }
@@ -154,7 +147,7 @@ class BookController {
           readingProgress: userLibrary?.readingProgress || 0,
           currentPage: userLibrary?.currentPage || 1,
           isFavorite: userLibrary?.isFavorite || false,
-          purchaseDate: userLibrary?.purchaseDate
+          addedDate: userLibrary?.addedDate
         };
       }
 
@@ -201,7 +194,6 @@ class BookController {
 
       const books = await Book.findAndCountAll({
         where: {
-          status: 'active',
           [Op.or]: [
             { title: { [Op.like]: `%${q}%` } },
             { description: { [Op.like]: `%${q}%` } },
@@ -261,7 +253,6 @@ class BookController {
 
       const books = await Book.findAll({
         where: { 
-          status: 'active',
           isFeatured: true 
         },
         include: [
@@ -304,10 +295,6 @@ class BookController {
       const { limit = 6 } = req.query;
 
       const books = await Book.findAll({
-        where: { 
-          status: 'active',
-          isBestseller: true 
-        },
         include: [
           {
             model: Category,
@@ -323,7 +310,7 @@ class BookController {
             }
           }
         ],
-        order: [['totalPurchases', 'DESC'], ['totalRevenue', 'DESC']],
+        order: [['rating', 'DESC'], ['totalReviews', 'DESC']],
         limit: parseInt(limit)
       });
 
@@ -349,7 +336,6 @@ class BookController {
 
       const books = await Book.findAll({
         where: { 
-          status: 'active',
           isNewRelease: true 
         },
         include: [
@@ -432,14 +418,13 @@ class BookController {
 
   // ===== ADMIN CRUD METHODS =====
 
-  // Get all books for admin (including inactive)
+  // Get all books for admin
   async getAllBooks(req, res) {
     try {
       const {
         page = 1,
         limit = 50,
         category,
-        status,
         search,
         sortBy = 'createdAt',
         sortOrder = 'DESC'
@@ -451,10 +436,6 @@ class BookController {
       // Apply filters
       if (category) {
         whereClause.categoryId = category;
-      }
-
-      if (status) {
-        whereClause.status = status;
       }
 
       if (search) {
@@ -563,27 +544,29 @@ class BookController {
         subtitle,
         description,
         isbn,
-        price,
-        discountPrice,
         categoryId,
         publisher,
         publicationDate,
         pageCount,
         language,
         authorIds,
-        status = 'active',
         isFeatured = false,
         isBestseller = false,
         isNewRelease = false,
         tags,
-        metadata
+        metadata,
+        coverImage,
+        fileUrl,
+        fileSize,
+        previewUrl,
+        samplePages
       } = req.body;
 
       // Validate required fields
-      if (!title || !description || !price || !categoryId) {
+      if (!title || !description || !categoryId) {
         return res.status(400).json({
           success: false,
-          message: 'Tiêu đề, mô tả, giá và danh mục là bắt buộc'
+          message: 'Tiêu đề, mô tả và danh mục là bắt buộc'
         });
       }
 
@@ -602,25 +585,34 @@ class BookController {
         subtitle,
         description,
         isbn,
-        price: parseFloat(price),
-        discountPrice: discountPrice ? parseFloat(discountPrice) : null,
+        // Removed price and discountPrice fields as this is now a free reading app
         categoryId: parseInt(categoryId),
         publisher,
         publicationDate,
         pageCount: pageCount ? parseInt(pageCount) : null,
         language,
-        status,
         isFeatured,
         isBestseller,
         isNewRelease,
         tags: tags ?? null,
-        metadata: metadata ?? null
+        metadata: metadata ?? null,
+        coverImage,
+        fileUrl,
+        fileSize: fileSize ? parseInt(fileSize) : null,
+        previewUrl,
+        samplePages: samplePages ? parseInt(samplePages) : null,
+        // Set default values for statistics
+        rating: 0.00,
+        totalReviews: 0
       });
 
       // Add authors if provided
       if (authorIds && authorIds.length > 0) {
         await book.setAuthors(authorIds);
       }
+
+      // Update category book count
+      await category.updateBookCount();
 
       // Fetch the created book with relations
       const createdBook = await Book.findByPk(book.id, {
@@ -666,20 +658,22 @@ class BookController {
         subtitle,
         description,
         isbn,
-        price,
-        discountPrice,
         categoryId,
         publisher,
         publicationDate,
         pageCount,
         language,
         authorIds,
-        status,
         isFeatured,
         isBestseller,
         isNewRelease,
         tags,
-        metadata
+        metadata,
+        coverImage,
+        fileUrl,
+        fileSize,
+        previewUrl,
+        samplePages
       } = req.body;
 
       const book = await Book.findByPk(id);
@@ -707,25 +701,44 @@ class BookController {
       if (subtitle !== undefined) updateData.subtitle = subtitle;
       if (description !== undefined) updateData.description = description;
       if (isbn !== undefined) updateData.isbn = isbn;
-      if (price !== undefined) updateData.price = parseFloat(price);
-      if (discountPrice !== undefined) updateData.discountPrice = discountPrice ? parseFloat(discountPrice) : null;
+      // Removed price and discount logic as this is now a free reading app
       if (categoryId !== undefined) updateData.categoryId = parseInt(categoryId);
       if (publisher !== undefined) updateData.publisher = publisher;
       if (publicationDate !== undefined) updateData.publicationDate = publicationDate;
       if (pageCount !== undefined) updateData.pageCount = pageCount ? parseInt(pageCount) : null;
       if (language !== undefined) updateData.language = language;
-      if (status !== undefined) updateData.status = status;
       if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
       if (isBestseller !== undefined) updateData.isBestseller = isBestseller;
       if (isNewRelease !== undefined) updateData.isNewRelease = isNewRelease;
       if (tags !== undefined) updateData.tags = tags ?? null;
       if (metadata !== undefined) updateData.metadata = metadata ?? null;
+      if (coverImage !== undefined) updateData.coverImage = coverImage;
+      if (fileUrl !== undefined) updateData.fileUrl = fileUrl;
+      if (fileSize !== undefined) updateData.fileSize = fileSize ? parseInt(fileSize) : null;
+      if (previewUrl !== undefined) updateData.previewUrl = previewUrl;
+      if (samplePages !== undefined) updateData.samplePages = samplePages ? parseInt(samplePages) : null;
+
+      // Removed price and discount logic as this is now a free reading app
 
       await book.update(updateData);
 
       // Update authors if provided
       if (authorIds !== undefined) {
         await book.setAuthors(authorIds || []);
+      }
+
+      // Update category book counts if category changed
+      if (categoryId !== undefined && categoryId !== book.categoryId) {
+        // Update old category count
+        const oldCategory = await Category.findByPk(book.categoryId);
+        if (oldCategory) {
+          await oldCategory.updateBookCount();
+        }
+        // Update new category count
+        const newCategory = await Category.findByPk(categoryId);
+        if (newCategory) {
+          await newCategory.updateBookCount();
+        }
       }
 
       // Fetch the updated book with relations
@@ -788,8 +801,7 @@ class BookController {
       const suggestedBooks = await Book.findAll({
         where: {
           id: { [Op.ne]: id },
-          categoryId: currentBook.categoryId,
-          status: 'active'
+          categoryId: currentBook.categoryId
         },
         include: [
           {
@@ -842,25 +854,21 @@ class BookController {
         });
       }
 
-      // Check if book has any purchases or reviews
-      const hasPurchases = await UserLibrary.findOne({ where: { bookId: id } });
-      const hasReviews = await Review.findOne({ where: { bookId: id } });
-
-      if (hasPurchases || hasReviews) {
-        // Soft delete - just deactivate
-        await book.update({ status: 'inactive' });
-        res.json({
-          success: true,
-          message: 'Sách đã được vô hiệu hóa (có dữ liệu liên quan)'
-        });
-      } else {
-        // Hard delete
-        await book.destroy();
-        res.json({
-          success: true,
-          message: 'Xóa sách thành công'
-        });
+      // Get category before deleting to update count
+      const category = await Category.findByPk(book.categoryId);
+      
+      // Hard delete - always delete from database
+      await book.destroy();
+      
+      // Update category book count
+      if (category) {
+        await category.updateBookCount();
       }
+      
+      res.json({
+        success: true,
+        message: 'Xóa sách thành công'
+      });
 
     } catch (error) {
       console.error('Delete book error:', error);

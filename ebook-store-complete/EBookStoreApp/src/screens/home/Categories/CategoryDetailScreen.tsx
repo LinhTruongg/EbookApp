@@ -11,7 +11,7 @@ import {
   StatusBar,
 } from 'react-native';
 import { COLORS, SIZES, COMMON_STYLES } from '../../../constants';
-import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -39,21 +39,18 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
     const fetchBooks = async () => {
       try {
         setLoading(true);
-        const response = await apiService.getBooksByCategoryId(String(category.id));
+        const response = await simpleApiService.getBooksByCategoryId(String(category.id));
         console.log('Category books response:', response);
         console.log('Response data:', response.data);
         console.log('Books array:', response.data?.books);
         const serverBooks = (response.data?.books || []).map((b: any) => {
           const authorNames = Array.isArray(b.authors) && b.authors.length > 0 ? b.authors.map((a: any) => a.name).join(', ') : '';
-          const hasDiscount = b.discountPrice && Number(b.discountPrice) < Number(b.price);
-          const finalPrice = hasDiscount ? Number(b.discountPrice) : Number(b.price);
           return {
             id: String(b.id),
             title: b.title,
             author: authorNames,
             coverImage: b.coverImage,
-            price: formatCurrency(finalPrice),
-            originalPrice: hasDiscount ? formatCurrency(Number(b.price)) : undefined,
+            price: 'Đọc miễn phí',
             rating: Number(b.rating || 0),
             reviews: Number(b.totalReviews || 0),
             description: b.description,
@@ -78,11 +75,7 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
   }, [category]);
 
   const formatCurrency = (value: number) => {
-    try {
-      return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(value);
-    } catch {
-      return `${Math.round(value).toLocaleString('vi-VN')} đ`;
-    }
+    return 'Đọc miễn phí';
   };
 
   const renderBookItem = ({ item }: { item: any }) => (
@@ -100,9 +93,6 @@ const CategoryDetailScreen: React.FC<CategoryDetailScreenProps> = ({ route, navi
         </View>
         <View style={styles.priceContainer}>
           <Text style={styles.price}>{item.price}</Text>
-          {item.originalPrice ? (
-            <Text style={styles.originalPrice}>{item.originalPrice}</Text>
-          ) : null}
         </View>
       </View>
     </TouchableOpacity>

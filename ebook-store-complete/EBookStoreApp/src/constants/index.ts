@@ -15,6 +15,13 @@ export const COLORS = {
   accentLight: '#FBBF24',    // Light amber
   accentDark: '#D97706',     // Dark amber
   
+  // Rating colors
+  ratingGold: '#FFD700',     // Gold for 5 stars
+  ratingSilver: '#C0C0C0',   // Silver for 4 stars
+  ratingBronze: '#CD7F32',   // Bronze for 3 stars
+  ratingOrange: '#FF9800',   // Orange for 2 stars
+  ratingRed: '#F44336',       // Red for 1 star
+  
   // Status colors
   success: '#10B981',        // Green
   warning: '#F59E0B',        // Amber
@@ -56,6 +63,17 @@ export const COLORS = {
   surface: '#FFFFFF',        // Card background
   surfaceElevated: '#FFFFFF', // Elevated surface
   surfaceOverlay: 'rgba(0, 0, 0, 0.5)', // Overlay background
+  
+  // Modern UI colors
+  modernBlue: '#3B82F6',     // Modern blue
+  modernPurple: '#8B5CF6',   // Modern purple
+  modernGreen: '#10B981',    // Modern green
+  modernOrange: '#F59E0B',   // Modern orange
+  modernRed: '#EF4444',      // Modern red
+  
+  // Gradient colors
+  gradientStart: '#667eea',   // Gradient start
+  gradientEnd: '#764ba2',     // Gradient end
 };
 
 // Font sizes - Cross-platform optimized
