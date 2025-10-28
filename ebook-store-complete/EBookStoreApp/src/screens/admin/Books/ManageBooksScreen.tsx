@@ -12,7 +12,11 @@ import {
   RefreshControl,
   SafeAreaView,
   ScrollView,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 import { apiService } from '../../../services/api';
 import { Book, Category, Author } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
@@ -56,6 +60,15 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     isBestseller: false,
     isNewRelease: false,
   });
+
+  const [selectedFile, setSelectedFile] = useState<{
+    name: string;
+    uri: string;
+    size: number;
+    type: string;
+  } | null>(null);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -137,6 +150,42 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     setSearchQuery(text);
   };
 
+  const pickBookFile = async () => {
+    try {
+      console.log('📂 Opening file picker...');
+
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/epub+zip', 'application/x-mobipocket-ebook', 'text/plain'],
+        copyToCacheDirectory: true,
+      }) as any;
+
+      console.log('📂 File picker result:', JSON.stringify(result, null, 2));
+
+      // The newer API always returns an object with 'canceled' and 'assets' properties
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('✅ File selected:', asset);
+
+        setSelectedFile({
+          name: asset.name,
+          uri: asset.uri,
+          size: asset.size || 0,
+          type: asset.mimeType || 'application/octet-stream',
+        });
+
+        Alert.alert('✅ Thành công', `Đã chọn file: ${asset.name}`);
+      } else if (result.canceled) {
+        console.log('❌ User cancelled file picker');
+      } else {
+        console.warn('⚠️ Unexpected file picker result:', result);
+        Alert.alert('⚠️ Lỗi', 'Không thể xử lý file. Vui lòng thử lại.');
+      }
+    } catch (error) {
+      console.error('❌ File picker error:', error);
+      Alert.alert('❌ Lỗi', `Không thể chọn file. Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -153,25 +202,38 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
       isBestseller: false,
       isNewRelease: false,
     });
+    setSelectedFile(null);
     setEditingBook(null);
     setValidationErrors({});
   };
 
   const handleSubmit = async () => {
+    console.log('🔍 Starting form submission...');
+    console.log('📋 Form data:', formData);
+    console.log('📁 Selected file:', selectedFile);
+    console.log('📁 Is selectedFile null?', selectedFile === null);
+    console.log('📁 Is selectedFile undefined?', selectedFile === undefined);
+    console.log('📁 selectedFile truthy?', !!selectedFile);
+
     // Validate required fields
     const errors = [];
-    
+
     if (!formData.title.trim()) {
       errors.push('• Tiêu đề sách');
     }
-    
+
     if (!formData.description.trim()) {
       errors.push('• Mô tả sách');
     }
-    
-    if (!formData.categoryId.trim()) {
+
+    // Check categoryId - ensure it's a non-empty string
+    const categoryIdStr = String(formData.categoryId || '').trim();
+    if (!categoryIdStr) {
       errors.push('• Danh mục sách');
     }
+
+    console.log('✓ Validation errors:', errors);
+    console.log('ℹ️ CategoryId value:', formData.categoryId, 'Type:', typeof formData.categoryId);
     
     // Validate description length
     if (formData.description.trim() && formData.description.trim().length < 1) {
@@ -200,71 +262,192 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         errors.push('• Ngày xuất bản phải có định dạng YYYY-MM-DD');
       }
     }
-    
+
+    // Validate file is provided when creating new book (not required for updates)
+    if (!editingBook && !selectedFile) {
+      errors.push('• Tệp sách là bắt buộc khi tạo sách mới');
+    }
+
     if (errors.length > 0) {
+      console.log('❌ Validation failed with errors:', errors);
       // Set validation errors for visual feedback
       const fieldErrors: {[key: string]: string} = {};
       if (!formData.title.trim()) fieldErrors.title = 'Tiêu đề sách là bắt buộc';
       if (!formData.description.trim()) fieldErrors.description = 'Mô tả sách là bắt buộc';
-      if (!formData.categoryId.trim()) fieldErrors.categoryId = 'Danh mục sách là bắt buộc';
-      
+      const categoryIdStr = String(formData.categoryId || '').trim();
+      if (!categoryIdStr) fieldErrors.categoryId = 'Danh mục sách là bắt buộc';
+      if (!editingBook && !selectedFile) fieldErrors.file = 'Tệp sách là bắt buộc';
+
       setValidationErrors(fieldErrors);
-      
+
       Alert.alert(
-        '⚠️ Thông tin không hợp lệ', 
+        '⚠️ Thông tin không hợp lệ',
         'Vui lòng kiểm tra lại các thông tin sau:\n\n' + errors.join('\n'),
         [{ text: 'Đóng', style: 'default' }]
       );
       return;
     }
-    
+
+    console.log('✅ Validation passed! Proceeding with submission...');
     // Clear validation errors if all fields are valid
     setValidationErrors({});
 
     try {
-      const submitData = {
-        title: formData.title.trim(),
-        subtitle: formData.subtitle.trim() || undefined,
-        description: formData.description.trim(),
-        isbn: formData.isbn.trim() || undefined,
-        // Removed price fields as this is now a free reading app
-        categoryId: parseInt(formData.categoryId),
-        publisher: formData.publisher.trim() || undefined,
-        publicationDate: formData.publicationDate || undefined,
-        pageCount: formData.pageCount ? parseInt(formData.pageCount) : undefined,
-        language: formData.language,
-        authorIds: (formData.authorIds || [])
-          .map((id) => parseInt(String(id), 10))
-          .filter((n) => Number.isFinite(n)),
-        isFeatured: formData.isFeatured,
-        isBestseller: formData.isBestseller,
-        isNewRelease: formData.isNewRelease,
-      };
+      console.log('⏳ Setting isSubmitting to true');
+      setIsSubmitting(true);
 
-      if (editingBook) {
-        const response = await apiService.updateBook(editingBook.id, submitData);
-        if (response.success) {
-          Alert.alert('Thành công', 'Cập nhật sách thành công');
-          setModalVisible(false);
-          resetForm();
-          loadData();
-        } else {
-          Alert.alert('Lỗi', response.message || 'Không thể cập nhật sách');
+      // Prepare data - use FormData if there's a file, otherwise use regular object
+      let submitData: any;
+
+      if (selectedFile) {
+        console.log('📤 Preparing FormData with file...');
+        console.log('✅ selectedFile exists:', {
+          name: selectedFile.name,
+          uri: selectedFile.uri,
+          type: selectedFile.type,
+          size: selectedFile.size,
+          hasMissingProps: !selectedFile.name || !selectedFile.uri || !selectedFile.type
+        });
+
+        // Use FormData for file upload
+        submitData = new FormData();
+        submitData.append('title', formData.title.trim());
+        if (formData.subtitle.trim()) submitData.append('subtitle', formData.subtitle.trim());
+        submitData.append('description', formData.description.trim());
+        if (formData.isbn.trim()) submitData.append('isbn', formData.isbn.trim());
+        submitData.append('categoryId', formData.categoryId);
+        if (formData.publisher.trim()) submitData.append('publisher', formData.publisher.trim());
+        if (formData.publicationDate) submitData.append('publicationDate', formData.publicationDate);
+        if (formData.pageCount) submitData.append('pageCount', formData.pageCount);
+        submitData.append('language', formData.language);
+
+        // Add authorIds as JSON string
+        const authorIds = (formData.authorIds || [])
+          .map((id) => parseInt(String(id), 10))
+          .filter((n) => Number.isFinite(n));
+        if (authorIds.length > 0) {
+          submitData.append('authorIds', JSON.stringify(authorIds));
+        }
+
+        submitData.append('isFeatured', formData.isFeatured.toString());
+        submitData.append('isBestseller', formData.isBestseller.toString());
+        submitData.append('isNewRelease', formData.isNewRelease.toString());
+
+        // Add file - IMPORTANT: For React Native/Expo FormData
+        // Must send file as a proper file object with uri, type, and name
+        console.log('📁 Appending file to FormData');
+        console.log('📁 File details:', {
+          name: selectedFile.name,
+          type: selectedFile.type,
+          uri: selectedFile.uri,
+          size: selectedFile.size
+        });
+
+        // Read file as Base64 to store directly in database
+        console.log('🔐 Reading file as Base64 for database storage...');
+        let fileBase64: string;
+
+        try {
+          if (selectedFile.uri.startsWith('blob:')) {
+            // Handle web blob - fetch and convert to Base64
+            console.log('🌐 Detected web blob URL - fetching and converting to Base64');
+            const response = await fetch(selectedFile.uri);
+            const blobData = await response.blob();
+            // Convert blob to Base64
+            const reader = new FileReader();
+            fileBase64 = await new Promise((resolve, reject) => {
+              reader.onload = () => {
+                const base64 = (reader.result as string).split(',')[1];
+                resolve(base64);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blobData);
+            });
+            console.log('✅ Web blob converted to Base64:', { size: fileBase64.length, preview: fileBase64.substring(0, 50) + '...' });
+          } else {
+            // For React Native, read file from URI as Base64
+            console.log('📱 Reading React Native file as Base64:', selectedFile.uri);
+            fileBase64 = await FileSystem.readAsStringAsync(selectedFile.uri, {
+              encoding: 'base64',
+            });
+            console.log('✅ File read as Base64:', { size: fileBase64.length, preview: fileBase64.substring(0, 50) + '...' });
+          }
+        } catch (error) {
+          console.error('❌ Error reading file as Base64:', error);
+          throw new Error('Failed to read file');
+        }
+
+        // Append file data as Base64
+        console.log('📁 Appending Base64 file data to FormData');
+        submitData.append('fileBase64', fileBase64);
+        submitData.append('fileName', selectedFile.name);
+        submitData.append('fileType', selectedFile.type);
+        submitData.append('fileSize', selectedFile.size.toString());
+
+        console.log('✅ FormData prepared with Base64 file data');
+        console.log('📋 FormData entries:');
+        for (const [key, value] of (submitData as any).entries()) {
+          if (key === 'fileBase64') {
+            console.log(`  - ${key}:`, `Base64 (${value.length} chars)`);
+          } else {
+            console.log(`  - ${key}:`, value);
+          }
         }
       } else {
-        const response = await apiService.createBook(submitData);
+        console.log('📝 Preparing regular JSON data (no file)...');
+        // Use regular object if no file
+        submitData = {
+          title: formData.title.trim(),
+          subtitle: formData.subtitle.trim() || undefined,
+          description: formData.description.trim(),
+          isbn: formData.isbn.trim() || undefined,
+          categoryId: parseInt(formData.categoryId),
+          publisher: formData.publisher.trim() || undefined,
+          publicationDate: formData.publicationDate || undefined,
+          pageCount: formData.pageCount ? parseInt(formData.pageCount) : undefined,
+          language: formData.language,
+          authorIds: (formData.authorIds || [])
+            .map((id) => parseInt(String(id), 10))
+            .filter((n) => Number.isFinite(n)),
+          isFeatured: formData.isFeatured,
+          isBestseller: formData.isBestseller,
+          isNewRelease: formData.isNewRelease,
+        };
+        console.log('✅ JSON data prepared:', submitData);
+      }
+
+      if (editingBook) {
+        console.log('🔄 Updating existing book:', editingBook.id);
+        const response = await apiService.updateBook(editingBook.id, submitData);
+        console.log('📨 Update response:', response);
         if (response.success) {
-          Alert.alert('Thành công', 'Tạo sách thành công');
+          Alert.alert('✅ Thành công', 'Cập nhật sách thành công');
           setModalVisible(false);
           resetForm();
           loadData();
         } else {
-          Alert.alert('Lỗi', response.message || 'Không thể tạo sách');
+          Alert.alert('❌ Lỗi', response.message || 'Không thể cập nhật sách');
+        }
+      } else {
+        console.log('➕ Creating new book');
+        const response = await apiService.createBook(submitData);
+        console.log('📨 Create response:', response);
+        if (response.success) {
+          Alert.alert('✅ Thành công', 'Tạo sách thành công');
+          setModalVisible(false);
+          resetForm();
+          loadData();
+        } else {
+          Alert.alert('❌ Lỗi', response.message || 'Không thể tạo sách');
         }
       }
     } catch (error) {
-      console.error('Submit error:', error);
-      Alert.alert('Lỗi', 'Có lỗi xảy ra khi xử lý yêu cầu');
+      console.error('❌ Submit error:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      Alert.alert('❌ Lỗi', `Có lỗi xảy ra: ${errorMessage}`);
+    } finally {
+      console.log('✓ Setting isSubmitting to false');
+      setIsSubmitting(false);
     }
   };
 
@@ -603,16 +786,62 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               </View>
             </View>
 
-            <TouchableOpacity 
-              style={styles.submitButton} 
-              onPress={handleSubmit}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>📁 Tệp sách (PDF, EPUB, MOBI, TXT) <Text style={styles.requiredAsterisk}>*</Text></Text>
+              <TouchableOpacity
+                style={[styles.filePickerButton, validationErrors.file && styles.filePickerButtonError]}
+                onPress={pickBookFile}
+              >
+                <Text style={styles.filePickerButtonText}>
+                  {selectedFile ? `✅ ${selectedFile.name}` : '📂 Chọn tệp sách'}
+                </Text>
+              </TouchableOpacity>
+              {validationErrors.file && (
+                <Text style={styles.errorText}>{validationErrors.file}</Text>
+              )}
+              {selectedFile && (
+                <View style={styles.fileInfoContainer}>
+                  <Text style={styles.fileInfoText}>
+                    📄 {selectedFile.name}
+                  </Text>
+                  <Text style={styles.fileInfoText}>
+                    📦 {selectedFile.size > 0 ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : 'Kích thước không xác định'}
+                  </Text>
+                  <Text style={styles.fileInfoText}>
+                    🏷️ {selectedFile.type || 'Loại file không xác định'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      console.log('❌ Removing selected file');
+                      setSelectedFile(null);
+                    }}
+                    style={styles.removeFileButton}
+                  >
+                    <Text style={styles.removeFileButtonText}>Xóa file</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.submitButton, isSubmitting && styles.disabledSubmitButton]}
+              onPress={() => {
+                console.log('🔘 Submit button pressed!');
+                console.log('isSubmitting:', isSubmitting);
+                handleSubmit();
+              }}
+              disabled={isSubmitting}
               accessibilityRole="button"
               accessibilityLabel={editingBook ? 'Cập nhật sách' : 'Tạo sách'}
               accessibilityHint={editingBook ? 'Lưu thay đổi thông tin sách' : 'Tạo sách mới với thông tin đã nhập'}
             >
-              <Text style={styles.submitButtonText}>
-                {editingBook ? 'Cập nhật sách' : 'Tạo sách'}
-              </Text>
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.submitButtonText}>
+                  {editingBook ? 'Cập nhật sách' : 'Tạo sách'}
+                </Text>
+              )}
             </TouchableOpacity>
           </ScrollView>
         </SafeAreaView>
@@ -891,6 +1120,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     marginLeft: 4,
+  },
+  filePickerButton: {
+    borderWidth: 2,
+    borderColor: '#3B82F6',
+    borderStyle: 'dashed',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    backgroundColor: '#EFF6FF',
+  },
+  filePickerButtonText: {
+    color: '#3B82F6',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  filePickerButtonError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
+  },
+  requiredAsterisk: {
+    color: '#EF4444',
+    fontWeight: '600',
+  },
+  fileInfoContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#F0FDF4',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#10B981',
+  },
+  fileInfoText: {
+    fontSize: 13,
+    color: '#374151',
+    marginVertical: 4,
+  },
+  removeFileButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  removeFileButtonText: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  disabledSubmitButton: {
+    opacity: 0.6,
   },
 });
 

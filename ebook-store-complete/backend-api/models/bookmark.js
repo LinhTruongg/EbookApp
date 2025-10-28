@@ -57,7 +57,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
-        min: { args: 1, msg: 'Số trang tối thiểu là 1' }
+        min: { args: [1], msg: 'Số trang tối thiểu là 1' }
       }
     },
     note: {

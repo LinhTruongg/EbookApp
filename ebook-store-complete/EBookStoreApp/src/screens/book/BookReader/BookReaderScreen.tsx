@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { COLORS, SIZES, COMMON_STYLES } from '../../../constants/index';
+import { API_CONFIG } from '../../../constants/api';
 import { apiService } from '../../../services/api';
 import { Book } from '../../../types';
 import { CloudinaryService } from '../../../services/cloudinaryService';
@@ -74,7 +75,7 @@ export default function BookReaderScreen() {
       setIsLoading(true);
       setError(null);
 
-      // Fetch book details from API
+      // Fetch book details from API (without file data)
       const bookResponse = await apiService.getBookById(bookId);
 
       if (!bookResponse.success || !bookResponse.data?.book) {
@@ -86,8 +87,24 @@ export default function BookReaderScreen() {
       const bookData = bookResponse.data.book;
       setBook(bookData);
 
+      // Fetch file data separately from dedicated endpoint
+      console.log('📥 Fetching file data from separate endpoint');
+      const fileResponse = await apiService.getBookFile(bookId);
+
+      if (!fileResponse.success || !fileResponse.data?.file) {
+        setError('This book does not have a PDF available for reading.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Add file data to book object for PDF URL resolution
+      const bookWithFile = {
+        ...bookData,
+        file: fileResponse.data.file
+      };
+
       // Determine PDF URL from multiple sources
-      const pdfSourceUrl = resolvePDFUrl(bookData);
+      const pdfSourceUrl = resolvePDFUrl(bookWithFile);
 
       if (!pdfSourceUrl) {
         setError('This book does not have a PDF available for reading.');
@@ -123,13 +140,42 @@ export default function BookReaderScreen() {
    * Resolve PDF URL from multiple sources with priority
    */
   const resolvePDFUrl = (book: Book): string | null => {
-    // Priority 1: Direct downloadable URL
+    // Priority 1: Base64 encoded file (stored directly in database)
+    if ((book as any).file) {
+      const fileData = (book as any).file;
+
+      // Check if it's Base64 data (doesn't start with / or http)
+      if (!fileData.startsWith('/') && !fileData.startsWith('http')) {
+        // Convert Base64 to data URL for PDF viewer
+        const base64Pdf = `data:application/pdf;base64,${fileData}`;
+        return base64Pdf;
+      }
+
+      // If it's a path, construct full URL
+      if (fileData.startsWith('/')) {
+        const baseUrl = API_CONFIG.BASE_URL || 'http://localhost:3000';
+        const fileUrl = `${baseUrl}${fileData}`;
+        return fileUrl;
+      }
+
+      // If it's already a URL
+      if (fileData.startsWith('http')) {
+        console.log('📄 Using file URL from database:', fileData);
+        return fileData;
+      }
+
+      console.warn('⚠️ File data found but format unknown:', fileData.substring(0, 50));
+    } else {
+      console.warn('⚠️ No file field found in book object');
+    }
+
+    // Priority 2: Direct downloadable URL
     // if (book.downloadableUrl) {
     //   console.log('📄 Using downloadableUrl:', book.downloadableUrl);
     //   return book.downloadableUrl;
     // }
 
-    // // Priority 2: Cloudinary asset ID
+    // Priority 3: Cloudinary asset ID
     // if (book.assetId) {
     //   try {
     //     const pdfUrl = CloudinaryService.getPDFUrl(book.assetId);
@@ -140,12 +186,13 @@ export default function BookReaderScreen() {
     //   }
     // }
 
-    // Priority 3: Direct file URL
+    // Priority 4: Direct file URL (legacy)
     if (book.fileUrl) {
-      console.log('📄 Using fileUrl:', book.fileUrl);
+      console.log('📄 Using legacy fileUrl:', book.fileUrl);
       return book.fileUrl;
     }
 
+    console.warn('⚠️ No file source found for book:', book.id);
     return null;
   };
 
@@ -321,7 +368,6 @@ export default function BookReaderScreen() {
 
   // Show PDF reader if loaded and PDF URL is available
   if (showPDFReader && book && pdfUrl) {
-    console.log('📄 PDF URL:', pdfUrl);
     return (
       <PDFViewer
         pdfUrl={pdfUrl}

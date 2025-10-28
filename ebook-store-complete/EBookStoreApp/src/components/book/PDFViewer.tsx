@@ -54,6 +54,23 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
 
     const fetchPDFNatively = async () => {
       try {
+        // Check if it's a data URL (Base64 encoded)
+        if (pdfUrl.startsWith('data:')) {
+
+
+          // Extract base64 from data URL format: data:application/pdf;base64,{base64Data}
+          const base64Match = pdfUrl.match(/base64,(.+)$/);
+
+          if (base64Match && base64Match[1]) {
+            const base64Data = base64Match[1];
+            setPdfBase64(base64Data);
+          } else {
+            throw new Error('Invalid data URL format');
+          }
+          return;
+        }
+
+        // For HTTP/HTTPS URLs, fetch normally
         console.log('📥 Fetching PDF from URL:', pdfUrl);
         const response = await fetch(pdfUrl);
 
@@ -74,7 +91,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
               // Extract base64 from data URL
               const base64 = result.split(',')[1];
               if (base64) {
-                console.log('✅ PDF converted to base64');
+
                 setPdfBase64(base64);
               } else {
                 reject(new Error('Failed to convert PDF to base64'));

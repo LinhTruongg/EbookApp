@@ -63,7 +63,6 @@ module.exports = {
       }
     });
 
-    // Add indexes for better performance
     await queryInterface.addIndex('comments', ['book_id'], {
       name: 'idx_comments_book_id'
     });

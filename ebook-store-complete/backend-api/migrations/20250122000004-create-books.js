@@ -30,14 +30,6 @@ module.exports = {
         type: Sequelize.STRING(500),
         allowNull: true
       },
-      price: {
-        type: Sequelize.DECIMAL(10, 2),
-        allowNull: false
-      },
-      discount_price: {
-        type: Sequelize.DECIMAL(10, 2),
-        allowNull: true
-      },
       category_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
@@ -64,6 +56,10 @@ module.exports = {
         type: Sequelize.STRING(10),
         defaultValue: 'vi'
       },
+      asset_id: {
+        type: Sequelize.STRING(500),
+        allowNull: true
+      },
       file_url: {
         type: Sequelize.STRING(500),
         allowNull: true
@@ -80,6 +76,11 @@ module.exports = {
         type: Sequelize.INTEGER,
         defaultValue: 10
       },
+      file: {
+        type: Sequelize.TEXT('long'),
+        allowNull: true,
+        comment: 'Stores Base64 encoded book file data'
+      },
       rating: {
         type: Sequelize.DECIMAL(3, 2),
         defaultValue: 0.00
@@ -95,10 +96,6 @@ module.exports = {
       total_revenue: {
         type: Sequelize.DECIMAL(12, 2),
         defaultValue: 0.00
-      },
-      status: {
-        type: Sequelize.ENUM('draft', 'active', 'inactive', 'out_of_stock'),
-        defaultValue: 'draft'
       },
       is_featured: {
         type: Sequelize.BOOLEAN,
@@ -135,14 +132,8 @@ module.exports = {
     await queryInterface.addIndex('books', ['category_id'], {
       name: 'idx_category'
     });
-    await queryInterface.addIndex('books', ['price'], {
-      name: 'idx_price'
-    });
     await queryInterface.addIndex('books', ['rating'], {
       name: 'idx_rating'
-    });
-    await queryInterface.addIndex('books', ['status'], {
-      name: 'idx_status'
     });
     await queryInterface.addIndex('books', ['is_featured'], {
       name: 'idx_featured'

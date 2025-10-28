@@ -40,6 +40,7 @@ class BookController {
 
       const books = await Book.findAndCountAll({
         where: whereClause,
+        attributes: { exclude: ['file'] },
         include: [
           {
             model: Category,
@@ -60,6 +61,7 @@ class BookController {
         offset: parseInt(offset),
         distinct: true
       });
+
 
       res.json({
         success: true,
@@ -153,9 +155,12 @@ class BookController {
       // Generate downloadable URL from assetId
       const downloadableUrl =  CloudinaryUtils.generateSignedDownloadUrl(book.assetId)
 
-      // Add downloadable URL to book data
+      // Add downloadable URL to book data and exclude 'file' field (it's large and fetched separately)
+      const bookData = book.toJSON();
+      delete bookData.file; // Remove file field to reduce payload size
+
       const bookWithDownloadUrl = {
-        ...book.toJSON(),
+        ...bookData,
         downloadableUrl
       };
 
@@ -448,6 +453,7 @@ class BookController {
 
       const books = await Book.findAndCountAll({
         where: whereClause,
+        attributes: { exclude: ['file'] },
         include: [
           {
             model: Category,
@@ -520,9 +526,13 @@ class BookController {
         });
       }
 
+      // Exclude 'file' field to reduce payload size (file is fetched separately via /books/:id/file)
+      const bookData = book.toJSON ? book.toJSON() : book;
+      delete bookData.file;
+
       res.json({
         success: true,
-        data: book
+        data: bookData
       });
 
     } catch (error) {
@@ -538,6 +548,8 @@ class BookController {
   // Create new book
   async createBook(req, res) {
     try {
+      console.log('📝 [createBook] Request received');
+
       const {
         title,
         subtitle,
@@ -558,7 +570,8 @@ class BookController {
         fileUrl,
         fileSize,
         previewUrl,
-        samplePages
+        samplePages,
+        fileBase64
       } = req.body;
 
       // Validate required fields
@@ -566,6 +579,14 @@ class BookController {
         return res.status(400).json({
           success: false,
           message: 'Tiêu đề, mô tả và danh mục là bắt buộc'
+        });
+      }
+
+      // Validate Base64 file is provided (required for creating book)
+      if (!fileBase64) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tệp sách là bắt buộc khi tạo sách mới'
         });
       }
 
@@ -578,13 +599,19 @@ class BookController {
         });
       }
 
+      // Handle Base64 file data
+      let bookFile = null;
+      if (fileBase64) {
+        // Store Base64 data directly in the file column
+        bookFile = fileBase64;
+      }
+
       // Create book
       const book = await Book.create({
         title,
         subtitle,
         description,
         isbn,
-        // Removed price and discountPrice fields as this is now a free reading app
         categoryId: parseInt(categoryId),
         publisher,
         publicationDate,
@@ -600,6 +627,7 @@ class BookController {
         fileSize: fileSize ? parseInt(fileSize) : null,
         previewUrl,
         samplePages: samplePages ? parseInt(samplePages) : null,
+        file: bookFile,
         // Set default values for statistics
         rating: 0.00,
         totalReviews: 0
@@ -672,7 +700,8 @@ class BookController {
         fileUrl,
         fileSize,
         previewUrl,
-        samplePages
+        samplePages,
+        fileBase64
       } = req.body;
 
       const book = await Book.findByPk(id);
@@ -692,6 +721,18 @@ class BookController {
             message: 'Danh mục không tồn tại'
           });
         }
+      }
+
+      // Handle Base64 file data if provided (optional when updating)
+      let bookFile = undefined;
+      if (fileBase64) {
+        bookFile = fileBase64;
+        console.log('✅ [updateBook] Base64 file processed:', {
+          size: fileBase64.length,
+          fileName,
+          fileType,
+          preview: fileBase64.substring(0, 50) + '...'
+        });
       }
 
       // Update book fields
@@ -716,6 +757,7 @@ class BookController {
       if (fileSize !== undefined) updateData.fileSize = fileSize ? parseInt(fileSize) : null;
       if (previewUrl !== undefined) updateData.previewUrl = previewUrl;
       if (samplePages !== undefined) updateData.samplePages = samplePages ? parseInt(samplePages) : null;
+      if (bookFile !== undefined) updateData.file = bookFile;
 
       // Removed price and discount logic as this is now a free reading app
 
@@ -835,6 +877,54 @@ class BookController {
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi lấy sách gợi ý',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get book file data (Base64) - separate endpoint to avoid loading large data in list requests
+  async getBookFile(req, res) {
+    try {
+      const { id } = req.params;
+
+      console.log('📥 [getBookFile] Fetching file for book:', id);
+
+      const book = await Book.findByPk(id, {
+        attributes: ['id', 'title', 'file']
+      });
+
+      if (!book) {
+        console.warn('⚠️ [getBookFile] Book not found:', id);
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sách'
+        });
+      }
+
+      if (!book.file) {
+        console.warn('⚠️ [getBookFile] Book has no file:', id);
+        return res.status(404).json({
+          success: false,
+          message: 'Sách này không có file PDF'
+        });
+      }
+
+      console.log('✅ [getBookFile] File found, size:', book.file.length, 'characters');
+
+      res.json({
+        success: true,
+        data: {
+          bookId: book.id,
+          title: book.title,
+          file: book.file
+        }
+      });
+
+    } catch (error) {
+      console.error('❌ [getBookFile] Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi lấy file sách',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }

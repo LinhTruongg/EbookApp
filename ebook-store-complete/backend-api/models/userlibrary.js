@@ -78,29 +78,29 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số lần tải không thể âm' }
+        min: { args: [0], msg: 'Số lần tải không thể âm' }
       }
     },
     maxDownloads: {
       type: DataTypes.INTEGER,
       defaultValue: -1, // -1 means unlimited
       validate: {
-        min: { args: -1, msg: 'Giới hạn tải tối thiểu là -1' }
+        min: { args: [-1], msg: 'Giới hạn tải tối thiểu là -1' }
       }
     },
     readingProgress: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Tiến độ đọc tối thiểu là 0%' },
-        max: { args: 100, msg: 'Tiến độ đọc tối đa là 100%' }
+        min: { args: [0], msg: 'Tiến độ đọc tối thiểu là 0%' },
+        max: { args: [100], msg: 'Tiến độ đọc tối đa là 100%' }
       }
     },
     currentPage: {
       type: DataTypes.INTEGER,
       defaultValue: 1,
       validate: {
-        min: { args: 1, msg: 'Trang hiện tại tối thiểu là 1' }
+        min: { args: [1], msg: 'Trang hiện tại tối thiểu là 1' }
       }
     },
     lastReadAt: DataTypes.DATE,
@@ -112,7 +112,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Thời gian đọc không thể âm' }
+        min: { args: [0], msg: 'Thời gian đọc không thể âm' }
       }
     },
     notes: {

@@ -73,8 +73,8 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
       validate: {
-        min: { args: 1, msg: 'Đánh giá tối thiểu là 1 sao' },
-        max: { args: 5, msg: 'Đánh giá tối đa là 5 sao' },
+        min: { args: [1], msg: 'Đánh giá tối thiểu là 1 sao' },
+        max: { args: [5], msg: 'Đánh giá tối đa là 5 sao' },
         isInt: { msg: 'Đánh giá phải là số nguyên' }
       }
     },
@@ -104,7 +104,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số lượt hữu ích không thể âm' }
+        min: { args: [0], msg: 'Số lượt hữu ích không thể âm' }
       }
     },
     isApproved: {

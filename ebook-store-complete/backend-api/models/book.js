@@ -175,8 +175,8 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       field: 'page_count',
       validate: {
-        min: { args: 1, msg: 'Số trang phải lớn hơn 0' },
-        max: { args: 10000, msg: 'Số trang tối đa 10000' }
+        min: { args: [1], msg: 'Số trang phải lớn hơn 0' },
+        max: { args: [10000], msg: 'Số trang tối đa 10000' }
       }
     },
     language: {
@@ -204,7 +204,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.BIGINT,
       field: 'file_size',
       validate: {
-        min: { args: 0, msg: 'Kích thước file không hợp lệ' }
+        min: { args: [0], msg: 'Kích thước file không hợp lệ' }
       }
     },
     previewUrl: {
@@ -219,9 +219,15 @@ module.exports = (sequelize, DataTypes) => {
       field: 'sample_pages',
       defaultValue: 10,
       validate: {
-        min: { args: 1, msg: 'Số trang mẫu tối thiểu là 1' },
-        max: { args: 50, msg: 'Số trang mẫu tối đa là 50' }
+        min: { args: [1], msg: 'Số trang mẫu tối thiểu là 1' },
+        max: { args: [50], msg: 'Số trang mẫu tối đa là 50' }
       }
+    },
+    file: {
+      type: DataTypes.TEXT('long'),
+      field: 'file',
+      // Stores Base64 encoded file data directly in database
+      // No validation needed - Base64 strings are always valid
     },
     rating: {
       type: DataTypes.DECIMAL(3, 2),

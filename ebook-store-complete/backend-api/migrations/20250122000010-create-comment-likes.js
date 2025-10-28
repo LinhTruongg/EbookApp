@@ -2,7 +2,7 @@
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('ratings', {
+    await queryInterface.createTable('comment_likes', {
       id: {
         allowNull: false,
         autoIncrement: true,
@@ -19,23 +19,15 @@ module.exports = {
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },
-      book_id: {
+      comment_id: {
         type: Sequelize.INTEGER,
         allowNull: false,
         references: {
-          model: 'books',
+          model: 'comments',
           key: 'id'
         },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
-      },
-      rating: {
-        type: Sequelize.INTEGER,
-        allowNull: false,
-        validate: {
-          min: 1,
-          max: 5
-        }
       },
       created_at: {
         allowNull: false,
@@ -49,24 +41,17 @@ module.exports = {
       }
     });
 
-    // Add unique constraint for user_id and book_id
-    await queryInterface.addConstraint('ratings', {
-      fields: ['user_id', 'book_id'],
+    await queryInterface.addConstraint('comment_likes', {
+      fields: ['user_id', 'comment_id'],
       type: 'unique',
-      name: 'unique_user_book_rating'
+      name: 'unique_user_comment_like'
     });
 
-    // Add indexes for better performance
-    await queryInterface.addIndex('ratings', ['book_id'], {
-      name: 'idx_book_ratings'
-    });
-    
-    await queryInterface.addIndex('ratings', ['rating'], {
-      name: 'idx_rating_value'
-    });
+    await queryInterface.addIndex('comment_likes', ['user_id']);
+    await queryInterface.addIndex('comment_likes', ['comment_id']);
   },
 
   down: async (queryInterface, Sequelize) => {
-    await queryInterface.dropTable('ratings');
+    await queryInterface.dropTable('comment_likes');
   }
 };

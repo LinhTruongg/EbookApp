@@ -119,15 +119,15 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số sách không thể âm' }
+        min: { args: [0], msg: 'Số sách không thể âm' }
       }
     },
     avgRating: {
       type: DataTypes.DECIMAL(3, 2),
       defaultValue: 0.00,
       validate: {
-        min: { args: 0, msg: 'Đánh giá trung bình tối thiểu là 0' },
-        max: { args: 5, msg: 'Đánh giá trung bình tối đa là 5' }
+        min: { args: [0], msg: 'Đánh giá trung bình tối thiểu là 0' },
+        max: { args: [5], msg: 'Đánh giá trung bình tối đa là 5' }
       }
     },
     isActive: {

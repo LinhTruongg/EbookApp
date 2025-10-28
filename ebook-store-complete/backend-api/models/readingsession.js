@@ -73,14 +73,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số trang đọc không thể âm' }
+        min: { args: [0], msg: 'Số trang đọc không thể âm' }
       }
     },
     durationMinutes: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Thời gian đọc không thể âm' }
+        min: { args: [0], msg: 'Thời gian đọc không thể âm' }
       }
     },
     deviceInfo: {

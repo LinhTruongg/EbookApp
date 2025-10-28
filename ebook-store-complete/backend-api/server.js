@@ -21,6 +21,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const multer = require('multer');
 
 // Import models and database
 const db = require('./models');
@@ -97,8 +98,54 @@ app.use(cors({
 }));
 
 // Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Multer configuration for parsing FormData with Base64
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 100 * 1024 * 1024, // 100 MB limit for Base64 encoded files
+    fieldSize: 100 * 1024 * 1024, // 100 MB limit for individual form field values (Base64 data)
+    fields: 100,
+    files: 10
+  }
+});
+
+// Apply multer middleware for FormData parsing (without file storage, just field parsing)
+app.use(upload.any());
+
+// Debug middleware - Log request after multer processing
+app.use((req, _res, next) => {
+  if (req.method === 'POST' && req.path.includes('/books')) {
+    console.log('✅ [After Multer] Request processed successfully');
+    if (req.body && req.body.fileBase64) {
+      console.log('📦 [Multer] FormData parsed - fileBase64 size:', req.body.fileBase64.length);
+    }
+  }
+  next();
+});
+
+// Error handler for multer errors - logs them before passing to global error handler
+app.use((err, _req, _res, next) => {
+  if (err instanceof multer.MulterError) {
+    console.error('❌ [Multer Error]', {
+      code: err.code,
+      message: err.message,
+      field: err.field,
+      limit: err.limit
+    });
+
+    if (err.code === 'LIMIT_FIELD_SIZE') {
+      console.error('📊 [LIMIT_FIELD_SIZE] Field exceeded 100 MB limit. Base64 file too large.');
+      err.statusCode = 413;
+    } else if (err.code === 'LIMIT_FILE_SIZE') {
+      console.error('📊 [LIMIT_FILE_SIZE] File exceeded 100 MB limit.');
+      err.statusCode = 413;
+    }
+  }
+  next(err);
+});
 
 // Logging
 if (process.env.NODE_ENV === 'development') {

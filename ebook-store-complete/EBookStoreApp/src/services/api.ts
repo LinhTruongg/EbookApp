@@ -97,6 +97,14 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // DEBUG: Log request details
+        if (config.url?.includes('/books/admin')) {
+          console.log('🔍 [interceptor] Request to /books/admin');
+          console.log('🔍 [interceptor] config.headers:', config.headers);
+          console.log('🔍 [interceptor] config.data type:', config.data instanceof FormData ? 'FormData' : typeof config.data);
+        }
+
         return config;
       },
       (error) => Promise.reject(error)
@@ -456,6 +464,13 @@ class ApiService {
     return response.data;
   }
 
+  async getBookFile(bookId: string): Promise<ApiResponse<{ bookId: string; title: string; file: string }>> {
+    console.log('📥 Fetching book file data:', bookId);
+    const response = await this.axiosInstance.get(`/books/${bookId}/file`);
+    console.log('✅ Book file fetched successfully');
+    return response.data;
+  }
+
   async toggleWishlist(bookId: string): Promise<ApiResponse<{ inWishlist: boolean }>> {
     console.log('🌟 Toggling wishlist for book:', bookId);
     const response = await this.axiosInstance.post(`/books/${bookId}/wishlist`);
@@ -529,13 +544,124 @@ class ApiService {
 
   async createBook(bookData: any): Promise<ApiResponse<Book>> {
     console.log('📝 Creating new book...');
-    const response = await this.axiosInstance.post('/books/admin', bookData);
-    console.log('✅ Book created successfully');
-    return response.data;
+    console.log('📦 Data type:', bookData instanceof FormData ? 'FormData' : 'JSON');
+    console.log('📦 Data:', bookData instanceof FormData ? 'FormData object' : bookData);
+
+    // Handle FormData with native fetch (more reliable in React Native)
+    if (bookData instanceof FormData) {
+      console.log('⚙️ FormData detected - using native fetch instead of axios');
+      console.log('📋 FormData contents:');
+      // Log FormData entries for debugging
+      const formDataEntries: any = {};
+      if (typeof (bookData as any).entries === 'function') {
+        for (const [key, value] of (bookData as any).entries()) {
+          if (key === 'file') {
+            formDataEntries[key] = typeof value === 'object' ?
+              { uri: (value as any).uri, type: (value as any).type, name: (value as any).name } :
+              value;
+          } else {
+            formDataEntries[key] = value;
+          }
+          console.log(`  ✓ ${key}:`, formDataEntries[key]);
+        }
+      }
+      console.log('📦 Total fields:', Object.keys(formDataEntries).length);
+      console.log('📝 Has file field:', 'file' in formDataEntries);
+
+      try {
+        console.log('🚀 Sending request using fetch to /books/admin');
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+        const headers: any = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const baseURL = this.axiosInstance.defaults.baseURL;
+        const url = `${baseURL}/books/admin`;
+
+        console.log('🔗 URL:', url);
+        console.log('📋 Headers:', headers);
+        console.log('📡 Request method: POST');
+        console.log('📦 Request body type:', 'FormData');
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: bookData,
+        });
+
+        console.log('✅ Response status:', response.status);
+        const responseData = await response.json();
+        console.log('📨 Response data:', responseData);
+
+        if (!response.ok) {
+          console.error('❌ Server error:', responseData.message || `HTTP error! status: ${response.status}`);
+          throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        console.log('✅ Book created successfully');
+        return responseData;
+      } catch (error) {
+        console.error('❌ Error creating book with fetch:', error);
+        throw error;
+      }
+    }
+
+    // For regular JSON data, use axios
+    try {
+      console.log('🚀 Sending JSON request to /books/admin');
+      const response = await this.axiosInstance.post('/books/admin', bookData);
+      console.log('✅ Book created successfully');
+      console.log('📨 Response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ Error creating book:', error);
+      throw error;
+    }
   }
 
   async updateBook(id: string, bookData: any): Promise<ApiResponse<Book>> {
     console.log(`📝 Updating book ${id}...`);
+
+    // Handle FormData with native fetch (more reliable in React Native)
+    if (bookData instanceof FormData) {
+      console.log('⚙️ FormData detected - using native fetch instead of axios');
+
+      try {
+        console.log('🚀 Sending request using fetch to /books/admin/' + id);
+        const token = await AsyncStorage.getItem(STORAGE_KEYS.TOKEN);
+        const headers: any = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const baseURL = this.axiosInstance.defaults.baseURL;
+        const url = `${baseURL}/books/admin/${id}`;
+
+        console.log('🔗 URL:', url);
+
+        const response = await fetch(url, {
+          method: 'PUT',
+          headers,
+          body: bookData,
+        });
+
+        console.log('✅ Response status:', response.status);
+        const responseData = await response.json();
+        console.log('📨 Response:', responseData);
+
+        if (!response.ok) {
+          throw new Error(responseData.message || `HTTP error! status: ${response.status}`);
+        }
+
+        return responseData;
+      } catch (error) {
+        console.error('❌ Error updating book with fetch:', error);
+        throw error;
+      }
+    }
+
+    // For regular JSON data, use axios
     const response = await this.axiosInstance.put(`/books/admin/${id}`, bookData);
     console.log('✅ Book updated successfully');
     return response.data;

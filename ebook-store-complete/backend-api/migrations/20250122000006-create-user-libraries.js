@@ -42,8 +42,8 @@ module.exports = {
         allowNull: true
       },
       access_type: {
-        type: Sequelize.ENUM('purchased', 'free', 'subscription'),
-        defaultValue: 'purchased'
+        type: Sequelize.ENUM('free', 'subscription'),
+        defaultValue: 'free'
       },
       download_count: {
         type: Sequelize.INTEGER,

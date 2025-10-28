@@ -24,42 +24,23 @@ module.exports = (sequelize, DataTypes) => {
 
     // Instance methods
     async updateBookCount() {
-      const count = await this.countBooks({ 
-      });
-      this.booksCount = count;
-      await this.save();
-      return count;
+      try {
+        // Count books using Sequelize query
+        // Option 1: Using the auto-generated countBooks() method from the 'books' association
+        // This works because Category.hasMany(Book, { as: 'books' }) creates countBooks()
+        const count = await this.countBooks();
+
+        this.booksCount = count || 0;
+        await this.save();
+
+        console.log(`✅ Updated book count for category ${this.id}: ${count} books`);
+        return count;
+      } catch (error) {
+        console.error(`❌ Error updating book count for category ${this.id}:`, error);
+        throw error;
+      }
     }
 
-    async getFullPath() {
-      let path = [this.name];
-      let current = this;
-      
-      while (current.parentId) {
-        current = await current.getParent();
-        if (current) {
-          path.unshift(current.name);
-        } else {
-          break;
-        }
-      }
-      
-      return path.join(' > ');
-    }
-
-    async getAllSubcategories() {
-      const subcategories = await this.getSubcategories({
-        include: ['subcategories']
-      });
-      
-      let allSubs = [...subcategories];
-      for (let sub of subcategories) {
-        const nestedSubs = await sub.getAllSubcategories();
-        allSubs = [...allSubs, ...nestedSubs];
-      }
-      
-      return allSubs;
-    }
   }
 
   Category.init({
@@ -139,7 +120,10 @@ module.exports = (sequelize, DataTypes) => {
       field: 'sort_order',
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Thứ tự sắp xếp không thể âm' }
+        min: {
+          args: [0],
+          msg: 'Thứ tự sắp xếp không thể âm'
+        }
       }
     },
     booksCount: {
@@ -147,7 +131,10 @@ module.exports = (sequelize, DataTypes) => {
       field: 'books_count',
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số lượng sách không thể âm' }
+        min: {
+          args: [0],
+          msg: 'Số lượng sách không thể âm'
+        }
       }
     }
   }, {

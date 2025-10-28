@@ -83,9 +83,30 @@ router.get('/admin/:id', authenticateToken, requireAdmin, bookController.getBook
  * /api/books/admin:
  *   post:
  *     tags: [Admin Books]
- *     summary: Create new book
+ *     summary: Create new book with optional Base64 file data
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               categoryId:
+ *                 type: integer
+ *               fileBase64:
+ *                 type: string
+ *                 description: Base64 encoded file data
+ *               fileName:
+ *                 type: string
+ *               fileType:
+ *                 type: string
+ *               fileSize:
+ *                 type: string
  */
 router.post('/admin', authenticateToken, requireAdmin, bookController.createBook);
 
@@ -94,9 +115,28 @@ router.post('/admin', authenticateToken, requireAdmin, bookController.createBook
  * /api/books/admin/{id}:
  *   put:
  *     tags: [Admin Books]
- *     summary: Update book
+ *     summary: Update book with optional Base64 file data
  *     security:
  *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               fileBase64:
+ *                 type: string
+ *                 description: Base64 encoded file data
+ *               fileName:
+ *                 type: string
+ *               fileType:
+ *                 type: string
+ *               fileSize:
+ *                 type: string
  */
 router.put('/admin/:id', authenticateToken, requireAdmin, bookController.updateBook);
 
@@ -110,6 +150,27 @@ router.put('/admin/:id', authenticateToken, requireAdmin, bookController.updateB
  *       - bearerAuth: []
  */
 router.delete('/admin/:id', authenticateToken, requireAdmin, bookController.deleteBook);
+
+/**
+ * @swagger
+ * /api/books/{id}/file:
+ *   get:
+ *     tags: [Books]
+ *     summary: Get book file data (Base64) - separate endpoint for large file data
+ *     description: Fetches only the Base64 encoded file for a book. Use this when you need just the file without other book metadata.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Book file data
+ *       404:
+ *         description: Book or file not found
+ */
+router.get('/:id/file', optionalAuth, bookController.getBookFile);
 
 /**
  * @swagger

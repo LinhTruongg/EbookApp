@@ -57,14 +57,38 @@ const errorHandler = (err, req, res, next) => {
   // Multer file upload errors
   if (err.code === 'LIMIT_FILE_SIZE') {
     error = {
-      message: 'File too large',
-      statusCode: 400
+      message: 'File size exceeds maximum allowed (100 MB)',
+      statusCode: 413
     };
+    console.error('❌ [Multer] LIMIT_FILE_SIZE error');
+  }
+
+  if (err.code === 'LIMIT_FIELD_SIZE') {
+    error = {
+      message: 'Field value too large - file exceeds 100 MB limit',
+      statusCode: 413
+    };
+    console.error('❌ [Multer] LIMIT_FIELD_SIZE error - Base64 field exceeded 100 MB');
   }
 
   if (err.code === 'LIMIT_UNEXPECTED_FILE') {
     error = {
       message: 'Unexpected file field',
+      statusCode: 400
+    };
+    console.error('❌ [Multer] LIMIT_UNEXPECTED_FILE error');
+  }
+
+  if (err.code === 'LIMIT_PART_COUNT') {
+    error = {
+      message: 'Too many parts in request',
+      statusCode: 400
+    };
+  }
+
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    error = {
+      message: 'Too many files in request',
       statusCode: 400
     };
   }

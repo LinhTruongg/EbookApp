@@ -109,7 +109,7 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(10, 2),
       allowNull: false,
       validate: {
-        min: { args: 0, msg: 'Giá trị giảm giá không thể âm' },
+        min: { args: [0], msg: 'Giá trị giảm giá không thể âm' },
         isDecimal: { msg: 'Giá trị giảm giá phải là số thập phân' },
         validatePercentage(value) {
           if (this.discountType === 'percentage' && (value < 0 || value > 100)) {
@@ -122,26 +122,26 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DECIMAL(10, 2),
       defaultValue: 0.00,
       validate: {
-        min: { args: 0, msg: 'Số tiền tối thiểu không thể âm' }
+        min: { args: [0], msg: 'Số tiền tối thiểu không thể âm' }
       }
     },
     maximumDiscountAmount: {
       type: DataTypes.DECIMAL(10, 2),
       validate: {
-        min: { args: 0, msg: 'Số tiền giảm tối đa không thể âm' }
+        min: { args: [0], msg: 'Số tiền giảm tối đa không thể âm' }
       }
     },
     usageLimit: {
       type: DataTypes.INTEGER,
       validate: {
-        min: { args: 1, msg: 'Giới hạn sử dụng tối thiểu là 1' }
+        min: { args: [1], msg: 'Giới hạn sử dụng tối thiểu là 1' }
       }
     },
     usedCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: { args: 0, msg: 'Số lần sử dụng không thể âm' }
+        min: { args: [0], msg: 'Số lần sử dụng không thể âm' }
       }
     },
     validFrom: {
