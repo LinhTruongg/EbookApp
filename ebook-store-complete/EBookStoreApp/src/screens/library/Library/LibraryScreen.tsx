@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { COLORS, SIZES } from '../../../constants';
 import { simpleApiService } from '../../../services/simpleApi';
 import { Book } from '../../../types';
@@ -73,6 +74,13 @@ const LibraryScreen: React.FC = () => {
     return () => { off && off(); };
   }, []);
 
+  // Reload library when screen gains focus (returning from reader, etc.)
+  useFocusEffect(
+    useCallback(() => {
+      loadLibraryData();
+    }, [])
+  );
+
   const loadLibraryData = async () => {
     try {
       setLoading(true);
@@ -82,9 +90,30 @@ const LibraryScreen: React.FC = () => {
       ]);
 
       if (libRes.success && libRes.data) {
-        const reading = libRes.data.categories.reading.map((item: any) => item.book) || [];
-        const completed = libRes.data.categories.completed.map((item: any) => item.book) || [];
-        const favoritedFromLib = libRes.data.categories.favorited.map((item: any) => item.book) || [];
+        const reading = libRes.data.categories?.reading?.map((item: any) => ({
+          ...item.book,
+          readingProgress: item.readingProgress,
+          currentPage: item.currentPage,
+          lastReadAt: item.lastReadAt,
+          isFavorite: item.isFavorite,
+          readingTimeMinutes: item.readingTimeMinutes
+        })) || [];
+        const completed = libRes.data.categories?.completed?.map((item: any) => ({
+          ...item.book,
+          readingProgress: item.readingProgress,
+          currentPage: item.currentPage,
+          lastReadAt: item.lastReadAt,
+          isFavorite: item.isFavorite,
+          readingTimeMinutes: item.readingTimeMinutes
+        })) || [];
+        const favoritedFromLib = libRes.data.categories?.favorited?.map((item: any) => ({
+          ...item.book,
+          readingProgress: item.readingProgress,
+          currentPage: item.currentPage,
+          lastReadAt: item.lastReadAt,
+          isFavorite: item.isFavorite,
+          readingTimeMinutes: item.readingTimeMinutes
+        })) || [];
 
         const wishlistBooks = wishRes.success && (wishRes as any).data?.wishlist
           ? (wishRes as any).data.wishlist.map((w: any) => w.book)
@@ -96,7 +125,7 @@ const LibraryScreen: React.FC = () => {
         const favorited = Object.values(favoritedMap) as Book[];
 
         setBooks({ reading, favorited, completed });
-        setStatistics(libRes.data.statistics || {
+        setStatistics(libRes.data.stats || {
           totalBooks: 0,
           reading: reading.length,
           favorited: favorited.length,
@@ -177,33 +206,50 @@ const LibraryScreen: React.FC = () => {
     setFilteredBooks([]);
   };
 
-  const handleBookPress = (book: Book) => {
-    router.push(`/book-reader/${book.id}` as any);
+  const handleBookPress = (book: any) => {
+    // Pass current page as query parameter for reading continuation
+    const currentPage = book.currentPage || 1;
+    router.push(`/book-reader/${book.id}?page=${currentPage}` as any);
   };
 
-  const renderBookItem = ({ item }: { item: Book }) => (
-    <TouchableOpacity 
-      style={[styles.bookItem, { width: ITEM_WIDTH }]}
-      onPress={() => handleBookPress(item)}
-    >
-      <Image source={{ uri: item.coverImage || 'https://via.placeholder.com/150x200' }} style={styles.bookCover} />
-      <View style={styles.bookInfo}>
-        <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.bookAuthor} numberOfLines={1}>
-          {item.authors && item.authors?.length > 0 ? item.authors[0].name : 'Unknown Author'}
-        </Text>
-        {/* Show reading progress for books in reading tab */}
-        {activeTab === 'reading' && (
-          <View style={styles.progressContainer}>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: '0%' }]} />
+  const renderBookItem = ({ item }: { item: any }) => {
+    // Extract reading progress data from library entry
+    const readingProgress = item.readingProgress || 0;
+    const currentPage = item.currentPage || 1;
+    const lastReadAt = item.lastReadAt;
+    
+    return (
+      <TouchableOpacity 
+        style={[styles.bookItem, { width: ITEM_WIDTH }]}
+        onPress={() => handleBookPress(item)}
+      >
+        <Image source={{ uri: item.coverImage || 'https://via.placeholder.com/150x200' }} style={styles.bookCover} />
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>
+            {item.authors && item.authors?.length > 0 ? item.authors[0].name : 'Unknown Author'}
+          </Text>
+          {/* Show reading progress for books in reading tab */}
+          {activeTab === 'reading' && (
+            <View style={styles.progressContainer}>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${readingProgress}%` }]} />
+              </View>
+              <View style={styles.progressInfo}>
+                <Text style={styles.progressText}>{readingProgress}%</Text>
+                <Text style={styles.pageText}>Trang {currentPage}</Text>
+              </View>
+              {lastReadAt && (
+                <Text style={styles.lastReadText}>
+                  Đọc lần cuối: {new Date(lastReadAt).toLocaleDateString('vi-VN')}
+                </Text>
+              )}
             </View>
-            <Text style={styles.progressText}>0%</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
@@ -285,16 +331,6 @@ const LibraryScreen: React.FC = () => {
 
       {/* Books List */}
       <View style={styles.booksContainer}>
-        {getCurrentBooks()?.length === 0 && (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {activeTab === 'reading' ? 'Chưa có sách nào đang đọc' :
-               activeTab === 'favorited' ? 'Chưa có sách nào yêu thích' :
-               activeTab === 'completed' ? 'Chưa có sách nào đã đọc' :
-               'Chưa có sách nào'}
-            </Text>
-          </View>
-        )}
         {getCurrentBooks()?.length > 0 ? (
           <FlatList
             data={getCurrentBooks()}
@@ -485,10 +521,25 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderRadius: 2,
   },
+  progressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   progressText: {
     fontSize: SIZES.font.xs,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  pageText: {
+    fontSize: SIZES.font.xs,
     color: COLORS.textSecondary,
-    textAlign: 'center',
+  },
+  lastReadText: {
+    fontSize: SIZES.font.xs,
+    color: COLORS.textSecondary,
+    fontStyle: 'italic',
   },
   emptyContainer: {
     flex: 1,

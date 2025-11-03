@@ -37,6 +37,8 @@ const commentRoutes = require('./routes/comments');
 const ratingRoutes = require('./routes/ratings');
 const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
+const paymentRoutes = require('./routes/payments');
+const walletRoutes = require('./routes/wallet');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -181,6 +183,8 @@ app.use('/api/comments', commentRoutes);
 app.use('/api/ratings', ratingRoutes);
 app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
+app.use('/api/payments', paymentRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // API Documentation
 const swaggerJsdoc = require('swagger-jsdoc');

@@ -34,7 +34,10 @@ class ApiService {
   private axiosInstance: AxiosInstance;
 
   constructor() {
-    const baseURL = API_CONFIG.BASE_URL || '';
+    const alreadyHasApi = (API_CONFIG.BASE_URL || '').endsWith('/api');
+    const baseURL = alreadyHasApi
+      ? API_CONFIG.BASE_URL
+      : `${API_CONFIG.BASE_URL}${API_CONFIG.API_VERSION}`;
     console.log('🔧 ApiService initialized with baseURL:', baseURL);
     
     this.axiosInstance = axios.create({
@@ -74,7 +77,7 @@ class ApiService {
   }
 
   private async findWorkingUrl(): Promise<string | null> {
-    const urlsToTest = [this.currentBaseURL || ''];
+    const urlsToTest = [this.axiosInstance.defaults.baseURL || ''];
     console.log('🔍 Testing URLs:', urlsToTest);
     
     for (const url of urlsToTest) {
@@ -164,7 +167,7 @@ class ApiService {
 
   async login(data: LoginRequest): Promise<AuthResponse> {
     try {
-      console.log('🔵 ApiService.login called with:', { email: data.email, baseURL: this.currentBaseURL });
+      console.log('🔵 ApiService.login called with:', { email: data.email, baseURL: this.axiosInstance.defaults.baseURL });
       const response = await this.axiosInstance.post<AuthResponse>(
         API_ENDPOINTS.AUTH.LOGIN,
         data
@@ -435,6 +438,63 @@ class ApiService {
     return response.data;
   }
 
+  // ===== ADMIN AUTHOR CRUD METHODS =====
+
+  async getAllAuthorsAdmin(params: { search?: string; page?: number; limit?: number } = {}): Promise<ApiResponse<Author[]>> {
+    console.log('✍️ Fetching all authors for admin...', params);
+    const query = new URLSearchParams();
+    if (params.search) query.append('search', params.search);
+    if (params.page) query.append('page', String(params.page));
+    if (params.limit) query.append('limit', String(params.limit));
+    const url = query.toString() ? `/authors/admin/all?${query.toString()}` : '/authors/admin/all';
+    const response = await this.axiosInstance.get(url);
+    return response.data;
+  }
+
+  async getAuthorByIdAdmin(id: string): Promise<ApiResponse<Author>> {
+    console.log(`✍️ Fetching author ${id} for admin...`);
+    const response = await this.axiosInstance.get(`/authors/admin/${id}`);
+    return response.data;
+  }
+
+  async createAuthor(data: Partial<Author> & { name: string }): Promise<ApiResponse<Author>> {
+    console.log('✍️ Creating author...', data);
+    const payload: any = {
+      name: data.name,
+      bio: (data as any).bio || data.biography || undefined,
+      avatar: data.avatar,
+      birthDate: data.birthDate,
+      nationality: data.nationality,
+      website: data.website,
+      socialLinks: (data as any).socialLinks || data.socialMedia,
+      isActive: data.isActive,
+    };
+    const response = await this.axiosInstance.post('/authors/admin', payload);
+    return response.data;
+  }
+
+  async updateAuthor(id: string, data: Partial<Author>): Promise<ApiResponse<Author>> {
+    console.log('✍️ Updating author...', id, data);
+    const payload: any = {
+      name: data.name,
+      bio: (data as any).bio || data.biography,
+      avatar: data.avatar,
+      birthDate: data.birthDate,
+      nationality: data.nationality,
+      website: data.website,
+      socialLinks: (data as any).socialLinks || data.socialMedia,
+      isActive: data.isActive,
+    };
+    const response = await this.axiosInstance.put(`/authors/admin/${id}`, payload);
+    return response.data;
+  }
+
+  async deleteAuthor(id: string): Promise<ApiResponse> {
+    console.log('✍️ Deleting author...', id);
+    const response = await this.axiosInstance.delete(`/authors/admin/${id}`);
+    return response.data;
+  }
+
   async searchBooks(query: string): Promise<ApiResponse<Book[]>> {
     console.log('🔍 Searching books with query:', query);
     const response = await this.axiosInstance.get(`/books/search?q=${encodeURIComponent(query)}`);
@@ -479,11 +539,9 @@ class ApiService {
 
   async updateReadingProgress(bookId: string, currentPage: number, totalPages: number): Promise<ApiResponse> {
     console.log('📊 Updating reading progress:', { bookId, currentPage, totalPages });
-    const response = await this.axiosInstance.post('/users/reading-progress', {
-      bookId,
-      currentPage,
-      totalPages,
-      progress: Math.round((currentPage / totalPages) * 100)
+    const response = await this.axiosInstance.put(`/users/reading-progress/${bookId}`, {
+      progress: Math.round((currentPage / totalPages) * 100),
+      pageNumber: currentPage
     });
     console.log('✅ Reading progress updated successfully');
     return response.data;
@@ -676,9 +734,22 @@ class ApiService {
 
   // ===== ADMIN USER CRUD METHODS =====
 
-  async getAllUsersAdmin(): Promise<ApiResponse<User[]>> {
-    console.log('👥 Fetching all users for admin...');
-    const response = await this.axiosInstance.get('/users/admin/all');
+  async getAllUsersAdmin(searchParams: any = {}): Promise<ApiResponse<User[]>> {
+    console.log('👥 Fetching all users for admin...', searchParams);
+    const queryParams = new URLSearchParams();
+    
+    if (searchParams.search) queryParams.append('search', searchParams.search);
+    if (searchParams.bookTitle) queryParams.append('bookTitle', searchParams.bookTitle);
+    if (searchParams.role) queryParams.append('role', searchParams.role);
+    if (searchParams.isActive !== undefined) queryParams.append('isActive', searchParams.isActive.toString());
+    if (searchParams.page) queryParams.append('page', searchParams.page.toString());
+    if (searchParams.limit) queryParams.append('limit', searchParams.limit.toString());
+    if (searchParams.sortBy) queryParams.append('sortBy', searchParams.sortBy);
+    if (searchParams.sortOrder) queryParams.append('sortOrder', searchParams.sortOrder);
+    
+    const query = queryParams.toString();
+    const url = query ? `/users/admin/all?${query}` : '/users/admin/all';
+    const response = await this.axiosInstance.get(url);
     console.log('✅ All users fetched successfully');
     return response.data;
   }
@@ -932,6 +1003,132 @@ class ApiService {
     console.log('⭐ Deleting rating for book:', bookId);
     const response = await this.axiosInstance.delete(`/ratings/book/${bookId}`);
     console.log('✅ Rating deleted successfully');
+    return response.data;
+  }
+
+  // ===== WALLET METHODS =====
+
+  async getWalletBalance(): Promise<ApiResponse<{ balance: number }>> {
+    console.log('💰 Fetching wallet balance...');
+    const response = await this.axiosInstance.get('/wallet/balance');
+    console.log('✅ Wallet balance fetched successfully');
+    return response.data;
+  }
+
+  async convertToPoints(payload: { amountCents: number; rate?: number }): Promise<ApiResponse<{ pointsAdded: number; balance: number }>> {
+    const response = await this.axiosInstance.post('/wallet/convert', payload);
+    return response.data as any;
+  }
+
+  async purchaseBookWithPoints(payload: { bookId: string; pricePoints: number }): Promise<ApiResponse<{ balance: number }>> {
+    const response = await this.axiosInstance.post('/wallet/purchase-book', payload);
+    return response.data as any;
+  }
+
+  async getTransactions(params?: {
+    page?: number;
+    limit?: number;
+    type?: 'deposit' | 'purchase' | 'refund';
+    status?: 'pending' | 'completed' | 'failed' | 'cancelled';
+  }): Promise<ApiResponse<Array<{
+    id: number;
+    userId: number;
+    type: string;
+    amount: number;
+    status: string;
+    paymentMethod: string;
+    transactionCode: string;
+    description: string;
+    bookId?: number;
+    createdAt: string;
+    updatedAt: string;
+  }>>> {
+    console.log('💰 Fetching transactions...', params);
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.type) queryParams.append('type', params.type);
+    if (params?.status) queryParams.append('status', params.status);
+    
+    const query = queryParams.toString();
+    const url = query ? `/wallet/transactions?${query}` : '/wallet/transactions';
+    const response = await this.axiosInstance.get(url);
+    console.log('✅ Transactions fetched successfully');
+    return response.data;
+  }
+
+  async createDeposit(data: {
+    amount: number;
+    paymentMethod: string;
+  }): Promise<ApiResponse<{
+    transactionId: string;
+    qrCode?: string;
+    paymentUrl?: string;
+    bankInfo?: {
+      accountNumber: string;
+      accountName: string;
+      bankName: string;
+      amount: number;
+      content: string;
+    };
+  }>> {
+    console.log('💰 Creating deposit request...', data);
+    const response = await this.axiosInstance.post('/wallet/deposit', data);
+    console.log('✅ Deposit request created successfully');
+    return response.data;
+  }
+
+  async checkDepositStatus(transactionId: string): Promise<ApiResponse<{
+    id: number;
+    status: string;
+    amount: number;
+    createdAt: string;
+  }>> {
+    console.log('💰 Checking deposit status...', transactionId);
+    const response = await this.axiosInstance.get(`/wallet/deposit/${transactionId}`);
+    console.log('✅ Deposit status checked successfully');
+    return response.data;
+  }
+
+  // ===== PAYMENT METHODS =====
+
+  async purchaseBook(bookId: string): Promise<ApiResponse<{
+    success: boolean;
+    transactionId: string;
+    bookId: string;
+    message: string;
+  }>> {
+    console.log('💳 Purchasing book...', bookId);
+    const response = await this.axiosInstance.post('/payments/purchase-book', { bookId });
+    console.log('✅ Book purchased successfully');
+    return response.data;
+  }
+
+  async getPaymentHistory(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<Array<{
+    id: number;
+    type: string;
+    amount: number;
+    status: string;
+    bookId?: number;
+    createdAt: string;
+  }>>> {
+    console.log('💳 Fetching payment history...', params);
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    const url = query ? `/payments/history?${query}` : '/payments/history';
+    const response = await this.axiosInstance.get(url);
+    console.log('✅ Payment history fetched successfully');
+    return response.data;
+  }
+
+  async createPaymentIntent(payload: { amount: number; currency?: string }): Promise<{ success: boolean; data: { clientSecret: string } }> {
+    const response = await this.axiosInstance.post('/payments/create-payment-intent', payload);
     return response.data;
   }
 }

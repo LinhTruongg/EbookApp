@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { apiService } from '../../services/api';
@@ -184,58 +183,46 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
 
       {/* Chart */}
       <View style={styles.chartWrapper}>
-        {Platform.OS === 'web' ? (
-          <View style={styles.webChartContainer}>
-            <Text style={styles.webChartText}>📊 Biểu đồ tăng trưởng</Text>
-            <Text style={styles.webChartSubtext}>
-              Tổng: {data.totalUsers.toLocaleString()} người dùng
-            </Text>
-            <Text style={styles.webChartSubtext}>
-              Tăng trưởng: {data.growthPercentage >= 0 ? '+' : ''}{data.growthPercentage.toFixed(1)}%
-            </Text>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.chartScrollContainer}
+        >
+          <View style={styles.chartContainer}>
+            <LineChart
+              data={chartData}
+              width={getChartWidth()}
+              height={160}
+              chartConfig={{
+                backgroundColor: '#F8FAFC',
+                backgroundGradientFrom: '#F8FAFC',
+                backgroundGradientTo: '#F8FAFC',
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
+                style: {
+                  borderRadius: 8,
+                  marginHorizontal: 8,
+                },
+                propsForDots: {
+                  r: '3',
+                  strokeWidth: '2',
+                  stroke: '#3B82F6',
+                },
+                propsForBackgroundLines: {
+                  strokeDasharray: '3,3',
+                  stroke: '#E5E7EB',
+                },
+                paddingLeft: 16,
+                paddingRight: 16,
+                paddingTop: 16,
+                paddingBottom: 16,
+              }}
+              bezier
+              style={styles.chart}
+            />
           </View>
-        ) : (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chartScrollContainer}
-          >
-            <View style={styles.chartContainer}>
-              <LineChart
-                data={chartData}
-                width={getChartWidth()}
-                height={160}
-                chartConfig={{
-                  backgroundColor: '#F8FAFC',
-                  backgroundGradientFrom: '#F8FAFC',
-                  backgroundGradientTo: '#F8FAFC',
-                  decimalPlaces: 0,
-                  color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
-                  labelColor: (opacity = 1) => `rgba(107, 114, 128, ${opacity})`,
-                  style: {
-                    borderRadius: 8,
-                    marginHorizontal: 8,
-                  },
-                  propsForDots: {
-                    r: '3',
-                    strokeWidth: '2',
-                    stroke: '#3B82F6',
-                  },
-                  propsForBackgroundLines: {
-                    strokeDasharray: '3,3',
-                    stroke: '#E5E7EB',
-                  },
-                  paddingLeft: 16,
-                  paddingRight: 16,
-                  paddingTop: 16,
-                  paddingBottom: 16,
-                }}
-                bezier
-                style={styles.chart}
-              />
-            </View>
-          </ScrollView>
-        )}
+        </ScrollView>
       </View>
 
       {/* Legend */}
@@ -395,25 +382,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  webChartContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 160,
-  },
-  webChartText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1E293B',
-    marginBottom: 8,
-  },
-  webChartSubtext: {
-    fontSize: 14,
-    color: '#64748B',
-    marginBottom: 4,
   },
 });
 

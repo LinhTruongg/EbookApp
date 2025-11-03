@@ -70,7 +70,9 @@ class UserController {
         gender,
         address,
         readingPreferences,
-        favoriteCategories
+        favoriteCategories,
+        avatar,
+        avatarBase64
       } = req.body;
 
       const user = await User.findByPk(userId);
@@ -90,6 +92,33 @@ class UserController {
       if (address !== undefined) user.address = address;
       if (readingPreferences !== undefined) user.readingPreferences = readingPreferences;
       if (favoriteCategories !== undefined) user.favoriteCategories = favoriteCategories;
+
+      // Handle avatar update if provided
+      try {
+        if (avatar === null) {
+          user.avatar = null;
+        } else if (typeof avatar === 'string' && avatar.startsWith('http')) {
+          user.avatar = avatar;
+        } else if (avatarBase64) {
+          const CloudinaryUtils = require('../utils/cloudinaryUtils');
+          const uploadResult = await CloudinaryUtils.uploadBase64Image(
+            avatarBase64,
+            `users/avatars/${user.id}_${Date.now()}`,
+            {
+              folder: 'users/avatars',
+              resource_type: 'image',
+              format: 'jpg',
+              quality: 'auto',
+              transformation: [{ width: 300, height: 300, crop: 'fill', gravity: 'face' }]
+            }
+          );
+          if (uploadResult && uploadResult.secure_url) {
+            user.avatar = uploadResult.secure_url;
+          }
+        }
+      } catch (e) {
+        console.error('Avatar upload error:', e);
+      }
 
       await user.save();
 
@@ -343,14 +372,31 @@ class UserController {
         });
       }
 
-      const libraryEntry = await UserLibrary.findOne({
+      let libraryEntry = await UserLibrary.findOne({
         where: { userId, bookId }
       });
 
+      // If book is not in library, add it first
       if (!libraryEntry) {
-        return res.status(404).json({
-          success: false,
-          message: 'Sách không có trong thư viện của bạn'
+        // Check if book exists
+        const book = await Book.findByPk(bookId);
+        if (!book) {
+          return res.status(404).json({
+            success: false,
+            message: 'Không tìm thấy sách'
+          });
+        }
+
+        // Add book to library
+        libraryEntry = await UserLibrary.create({
+          userId,
+          bookId,
+          accessType: 'free',
+          pricePaid: 0.00,
+          readingProgress: 0,
+          currentPage: 1,
+          isFavorite: false,
+          readingTimeMinutes: 0
         });
       }
 
@@ -375,6 +421,138 @@ class UserController {
     }
   }
 
+  // Mark book as completed
+  async markBookAsCompleted(req, res) {
+    try {
+      const { bookId } = req.body;
+      const userId = req.user.id;
+
+      const libraryEntry = await UserLibrary.findOne({
+        where: { userId, bookId }
+      });
+
+      if (!libraryEntry) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sách không có trong thư viện của bạn'
+        });
+      }
+
+      // Mark as completed (100% progress)
+      await libraryEntry.updateReadingProgress(100, null);
+
+      res.json({
+        success: true,
+        message: 'Đánh dấu sách đã hoàn thành thành công',
+        data: {
+          progress: libraryEntry.readingProgress,
+          currentPage: libraryEntry.currentPage
+        }
+      });
+
+    } catch (error) {
+      console.error('Mark book as completed error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi đánh dấu sách hoàn thành',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Add book to user library
+  async addToLibrary(req, res) {
+    try {
+      const { bookId } = req.body;
+      const userId = req.user.id;
+
+      // Check if book exists
+      const book = await Book.findByPk(bookId);
+      if (!book) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy sách'
+        });
+      }
+
+      // Check if book is already in library
+      const existingEntry = await UserLibrary.findOne({
+        where: { userId, bookId }
+      });
+
+      if (existingEntry) {
+        return res.json({
+          success: true,
+          message: 'Sách đã có trong thư viện',
+          data: existingEntry
+        });
+      }
+
+      // Add book to library
+      const libraryEntry = await UserLibrary.create({
+        userId,
+        bookId,
+        accessType: 'free',
+        pricePaid: 0.00,
+        readingProgress: 0,
+        currentPage: 1,
+        isFavorite: false,
+        readingTimeMinutes: 0
+      });
+
+      res.json({
+        success: true,
+        message: 'Đã thêm sách vào thư viện',
+        data: libraryEntry
+      });
+
+    } catch (error) {
+      console.error('Add to library error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi thêm sách vào thư viện',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Get reading session for a book
+  async getReadingSession(req, res) {
+    try {
+      const { bookId } = req.params;
+      const userId = req.user.id;
+
+      const libraryEntry = await UserLibrary.findOne({
+        where: { userId, bookId }
+      });
+
+      if (!libraryEntry) {
+        return res.status(404).json({
+          success: false,
+          message: 'Sách không có trong thư viện của bạn'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          currentPage: libraryEntry.currentPage,
+          totalPages: 0, // This would need to be calculated based on book content
+          progress: libraryEntry.readingProgress,
+          lastReadAt: libraryEntry.lastReadAt
+        }
+      });
+
+    } catch (error) {
+      console.error('Get reading session error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi lấy phiên đọc',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
   // Helper method to get user statistics
   async getUserStats(userId) {
     try {
@@ -388,7 +566,6 @@ class UserController {
       const readingBooks = library.filter(entry => entry.readingProgress > 0 && entry.readingProgress < 100).length;
       const favoriteBooks = library.filter(entry => entry.isFavorite).length;
       const totalReadingTime = library.reduce((sum, entry) => sum + (entry.readingTimeMinutes || 0), 0);
-      // Removed totalSpent calculation as this is now a free reading app
 
       return {
         totalBooks,
@@ -397,7 +574,6 @@ class UserController {
         favoriteBooks,
         totalReadingTime, // in minutes
         totalReadingHours: Math.round(totalReadingTime / 60),
-        totalSpent,
         completionRate: totalBooks > 0 ? Math.round((completedBooks / totalBooks) * 100) : 0
       };
 

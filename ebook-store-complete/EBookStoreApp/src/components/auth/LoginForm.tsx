@@ -90,7 +90,15 @@ const LoginForm: React.FC = () => {
         </View>
         
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Mật khẩu</Text>
+          <View style={styles.passwordHeader}>
+            <Text style={styles.label}>Mật khẩu</Text>
+            <TouchableOpacity
+              onPress={() => router.push('/(auth)/forgot-password')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
+            </TouchableOpacity>
+          </View>
           <TextInput
             style={styles.input}
             placeholder="Nhập mật khẩu"
@@ -146,10 +154,20 @@ const styles = StyleSheet.create({
   inputContainer: {
     gap: SIZES.spacing.sm,
   },
+  passwordHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   label: {
     fontSize: SIZES.font.sm,
     fontWeight: '600',
     color: COLORS.text,
+  },
+  forgotPasswordText: {
+    fontSize: SIZES.font.sm,
+    color: COLORS.primary,
+    fontWeight: '500',
   },
   input: {
     ...COMMON_STYLES.input,

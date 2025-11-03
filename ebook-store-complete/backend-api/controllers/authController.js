@@ -179,18 +179,191 @@ class AuthController {
       user.resetPasswordExpires = resetExpires;
       await user.save();
 
-      await AuthController.prototype.sendPasswordResetCodeEmail(user.email, resetCode);
+      // Check if email service is configured
+      const isEmailConfigured = process.env.GMAIL_USER && process.env.GMAIL_PASS;
+      
+      if (isEmailConfigured) {
+        console.log(`✅ Gmail credentials found - Email will be sent`);
+      } else {
+        console.log(`⚠️ Gmail credentials not found - Code will be logged to console only`);
+      }
+      
+      // Try to send email
+      let emailSent = false;
+      let emailError = null;
+      
+      if (isEmailConfigured) {
+        try {
+          console.log(`🔄 Starting email send process for ${user.email}...`);
+          await AuthController.prototype.sendPasswordResetCodeEmail(user.email, resetCode);
+          emailSent = true;
+          console.log(`✅ Email sent successfully to ${user.email}`);
+        } catch (err) {
+          emailError = err;
+          console.error('❌ Email sending failed:', err.message);
+          console.error('Error details:', {
+            code: err.code,
+            command: err.command,
+            response: err.response,
+            responseCode: err.responseCode
+          });
+          
+          // In production, throw error to notify user
+          if (process.env.NODE_ENV === 'production') {
+            throw err;
+          }
+          // In development, log error but continue
+        }
+      }
 
-      res.json({
+      // In development or when email is not configured, log to console
+      if (!emailSent || process.env.NODE_ENV === 'development') {
+        console.log('\n═══════════════════════════════════════════════════════════');
+        console.log('📧 PASSWORD RESET CODE');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log(`📬 Email: ${user.email}`);
+        console.log(`🔑 Reset Code: ${resetCode}`);
+        console.log(`⏰ Expires: ${new Date(Date.now() + 10 * 60 * 1000).toLocaleString()}`);
+        console.log('═══════════════════════════════════════════════════════════\n');
+      }
+
+      // Generate forgot password token (JWT) - expires in 10 minutes
+      const forgotPasswordToken = jwt.sign(
+        { 
+          email: user.email,
+          type: 'forgot_password'
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+
+      const response = {
         success: true,
-        message: 'Mã khôi phục đã được gửi đến email của bạn'
-      });
+        message: emailSent 
+          ? 'Mã khôi phục đã được gửi đến email của bạn'
+          : 'Mã khôi phục đã được tạo. Vui lòng kiểm tra console server để lấy mã.',
+        data: {
+          token: forgotPasswordToken
+        }
+      };
+
+      // In development mode, include code and error info in response for testing
+      if (process.env.NODE_ENV === 'development') {
+        if (!emailSent) {
+          response.debug = {
+            resetCode: resetCode,
+            emailConfigured: isEmailConfigured,
+            emailError: emailError ? {
+              message: emailError.message,
+              code: emailError.code,
+              responseCode: emailError.responseCode
+            } : null,
+            message: emailError 
+              ? 'Email gửi thất bại. Xem chi tiết lỗi trong emailError.'
+              : 'Email service not configured. Code displayed for development.'
+          };
+        }
+      } else if (emailError) {
+        // In production, if email fails, still return success but log error
+        response.message = `Mã khôi phục đã được tạo nhưng không thể gửi email: ${emailError.message}`;
+      }
+
+      res.json(response);
 
     } catch (error) {
       console.error('Forgot password error:', error);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi xử lý yêu cầu đặt lại mật khẩu',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
+  // Verify forgot password OTP
+  async verifyForgotPassword(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const { token, otpCode } = req.body;
+
+      // Decode forgot password token
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.type !== 'forgot_password') {
+          return res.status(400).json({
+            success: false,
+            message: 'Token không hợp lệ'
+          });
+        }
+      } catch (jwtError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token không hợp lệ hoặc đã hết hạn'
+        });
+      }
+
+      const email = decoded.email;
+      const user = await User.findOne({ where: { email } });
+      
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng'
+        });
+      }
+
+      // Verify OTP code
+      if (!user.resetPasswordToken || user.resetPasswordToken !== otpCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP không đúng'
+        });
+      }
+
+      if (!user.resetPasswordExpires || user.resetPasswordExpires < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP đã hết hạn'
+        });
+      }
+
+      // Mark OTP as used
+      user.resetPasswordToken = null;
+      user.resetPasswordExpires = null;
+      await user.save();
+
+      // Generate verify token for password reset (expires in 15 minutes)
+      const verifyToken = jwt.sign(
+        {
+          email: user.email,
+          type: 'reset_password'
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      res.json({
+        success: true,
+        message: 'Mã OTP đã được xác thực thành công',
+        data: {
+          token: verifyToken
+        }
+      });
+
+    } catch (error) {
+      console.error('Verify forgot password error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi xác thực mã OTP',
         error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
@@ -210,24 +383,35 @@ class AuthController {
 
       const { token, password } = req.body;
 
-      const user = await User.findOne({
-        where: {
-          resetPasswordToken: token,
-          resetPasswordExpires: { [require('sequelize').Op.gt]: new Date() }
+      // Decode verify token
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.type !== 'reset_password') {
+          return res.status(400).json({
+            success: false,
+            message: 'Token không hợp lệ'
+          });
         }
-      });
-
-      if (!user) {
+      } catch (jwtError) {
         return res.status(400).json({
           success: false,
           message: 'Token không hợp lệ hoặc đã hết hạn'
         });
       }
 
+      const email = decoded.email;
+      const user = await User.findOne({ where: { email } });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy người dùng'
+        });
+      }
+
       // Update password
       user.password = password;
-      user.resetPasswordToken = null;
-      user.resetPasswordExpires = null;
       await user.save();
 
       res.json({
@@ -432,6 +616,14 @@ class AuthController {
   }
 
   async sendPasswordResetCodeEmail(email, code) {
+    // Check if email credentials are configured
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+      console.warn('⚠️ Gmail credentials not found in environment variables');
+      throw new Error('Email service not configured');
+    }
+
+    console.log(`📧 Attempting to send password reset code to ${email}...`);
+
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       host: 'smtp.gmail.com',
@@ -443,19 +635,59 @@ class AuthController {
       }
     });
 
+    // Verify transporter connection
+    try {
+      await transporter.verify();
+      console.log('✅ SMTP server connection verified');
+    } catch (verifyError) {
+      console.error('❌ SMTP verification failed:', verifyError);
+      throw new Error('Không thể kết nối đến dịch vụ email. Vui lòng kiểm tra cấu hình Gmail.');
+    }
+
+    // Get sender name from env or use default
+    const senderName = process.env.EMAIL_SENDER_NAME || 'EBook Store';
+    const senderEmail = process.env.GMAIL_USER;
+
     const mailOptions = {
-      from: process.env.GMAIL_USER,
+      from: {
+        name: senderName,
+        address: senderEmail
+      },
       to: email,
       subject: 'Mã khôi phục mật khẩu',
       text: `Mã khôi phục của bạn là: ${code}. Mã có hiệu lực trong 10 phút.`,
-      html: `<p>Mã khôi phục của bạn là: <b>${code}</b></p><p>Mã có hiệu lực trong 10 phút.</p>`
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563EB;">Khôi phục mật khẩu</h2>
+          <p>Bạn đã yêu cầu đặt lại mật khẩu cho tài khoản của mình.</p>
+          <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #6B7280;">Mã khôi phục của bạn:</p>
+            <p style="font-size: 32px; font-weight: bold; color: #2563EB; margin: 10px 0; letter-spacing: 4px;">${code}</p>
+          </div>
+          <p style="color: #6B7280; font-size: 14px;">Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
+          <p style="color: #6B7280; font-size: 12px; margin-top: 30px;">Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này.</p>
+        </div>
+      `
     };
 
     try {
-      await transporter.sendMail(mailOptions);
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Password reset code sent successfully to ${email}`);
+      console.log(`📬 Message ID: ${info.messageId}`);
+      return info;
     } catch (err) {
-      console.error('Send reset code email error:', err);
-      throw new Error('Không thể gửi email khôi phục. Vui lòng thử lại sau.');
+      console.error('❌ Send reset code email error:', err);
+      
+      // Provide more specific error messages
+      if (err.code === 'EAUTH') {
+        throw new Error('Xác thực Gmail thất bại. Vui lòng kiểm tra GMAIL_USER và GMAIL_PASS trong file .env');
+      } else if (err.code === 'ECONNECTION') {
+        throw new Error('Không thể kết nối đến SMTP server. Vui lòng kiểm tra kết nối internet.');
+      } else if (err.responseCode === 535) {
+        throw new Error('Tài khoản Gmail không hợp lệ hoặc chưa bật "Less secure app access". Vui lòng sử dụng App Password.');
+      }
+      
+      throw new Error(`Không thể gửi email khôi phục: ${err.message}`);
     }
   }
 }

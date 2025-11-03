@@ -162,6 +162,50 @@ class CloudinaryUtils {
   }
 
   /**
+   * Upload Base64 image to Cloudinary
+   * @param {string} base64Data - Base64 image data
+   * @param {string} publicId - Public ID for the image
+   * @param {object} options - Upload options
+   * @returns {Promise<object>} Upload result
+   */
+  static async uploadBase64Image(base64Data, publicId, options = {}) {
+    try {
+      const {
+        folder = 'uploads',
+        resource_type = 'image',
+        format = 'jpg',
+        quality = 'auto',
+        transformation = []
+      } = options;
+
+      const uploadOptions = {
+        public_id: publicId,
+        folder,
+        resource_type,
+        format,
+        quality,
+        transformation
+      };
+
+      const result = await cloudinary.uploader.upload(
+        `data:image/jpeg;base64,${base64Data}`,
+        uploadOptions
+      );
+
+      console.log('✅ [CloudinaryUtils] Image uploaded successfully:', {
+        publicId: result.public_id,
+        url: result.secure_url,
+        size: result.bytes
+      });
+
+      return result;
+    } catch (error) {
+      console.error('❌ [CloudinaryUtils] Error uploading image:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Extract public ID from Cloudinary URL
    * @param {string} url - Cloudinary URL
    * @returns {string|null} Public ID or null if not found

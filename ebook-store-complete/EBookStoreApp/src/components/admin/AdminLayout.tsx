@@ -52,6 +52,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title, hideHeader =
       icon: 'book-outline' as keyof typeof Ionicons.glyphMap
     },
     { 
+      id: 'authors', 
+      title: 'Quản lý tác giả', 
+      route: '/admin/authors',
+      icon: 'person-outline' as keyof typeof Ionicons.glyphMap
+    },
+    { 
       id: 'categories', 
       title: 'Quản lý danh mục', 
       route: '/admin/categories',
@@ -64,22 +70,10 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children, title, hideHeader =
       icon: 'people-outline' as keyof typeof Ionicons.glyphMap
     },
     { 
-      id: 'reviews', 
-      title: 'Quản lý đánh giá', 
-      route: '/admin/reviews',
-      icon: 'star-outline' as keyof typeof Ionicons.glyphMap
-    },
-    { 
       id: 'comments', 
       title: 'Quản lý bình luận', 
       route: '/admin/comments',
       icon: 'chatbubble-outline' as keyof typeof Ionicons.glyphMap
-    },
-    { 
-      id: 'analytics', 
-      title: 'Thống kê', 
-      route: '/admin/analytics',
-      icon: 'analytics-outline' as keyof typeof Ionicons.glyphMap
     },
   ];
 

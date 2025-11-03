@@ -11,7 +11,6 @@ import {
   Dimensions,
 } from 'react-native';
 import LoginForm from '../../../components/auth/LoginForm';
-import ApiTestButton from '../../../components/common/ApiTestButton';
 import { COLORS, SIZES } from '../../../constants';
 
 interface LoginScreenProps {
@@ -57,10 +56,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
               <View style={styles.formContainer}>
                 <LoginForm />
                 
-                {/* API Test Button for Debugging */}
-                <View style={styles.debugSection}>
-                  <ApiTestButton />
-                </View>
+                {/* debug section removed */}
                 
                 {/* Forgot Password Link */}
                 <TouchableOpacity
@@ -120,17 +116,17 @@ const styles = StyleSheet.create({
   },
   headerSection: {
     alignItems: 'center',
-    paddingTop: height * 0.08,
-    paddingBottom: height * 0.04,
+    paddingTop: 24,
+    paddingBottom: 12,
   },
   logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -141,16 +137,16 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   appTitle: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#ffffff',
-    marginBottom: 8,
+    marginBottom: 6,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
   },
   appSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     fontWeight: '300',
@@ -158,12 +154,12 @@ const styles = StyleSheet.create({
   formSection: {
     flex: 1,
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: 10,
   },
   formContainer: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 20,
-    padding: 30,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -175,7 +171,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordContainer: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 12,
   },
   forgotPasswordText: {
     fontSize: 14,
@@ -183,7 +179,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   bottomSection: {
-    paddingVertical: 30,
+    paddingVertical: 16,
   },
   dividerContainer: {
     flexDirection: 'row',

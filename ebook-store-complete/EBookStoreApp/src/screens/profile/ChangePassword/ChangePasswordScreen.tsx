@@ -111,10 +111,6 @@ export default function ChangePasswordScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Đổi mật khẩu</Text>
-        </View>
-
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Mật khẩu hiện tại *</Text>

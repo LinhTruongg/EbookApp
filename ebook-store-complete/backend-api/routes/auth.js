@@ -6,6 +6,7 @@ const {
   registerValidation,
   loginValidation,
   forgotPasswordValidation,
+  verifyForgotPasswordValidation,
   resetPasswordValidation,
   changePasswordValidation
 } = require('../validators/authValidators');
@@ -67,10 +68,19 @@ router.post('/forgot-password', forgotPasswordValidation, authController.forgotP
 
 /**
  * @swagger
+ * /api/auth/verify-forgot-password:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Verify forgot password OTP
+ */
+router.post('/verify-forgot-password', verifyForgotPasswordValidation, authController.verifyForgotPassword);
+
+/**
+ * @swagger
  * /api/auth/reset-password:
  *   post:
  *     tags: [Authentication]
- *     summary: Reset password with token
+ *     summary: Reset password with verify token
  */
 router.post('/reset-password', resetPasswordValidation, authController.resetPassword);
 

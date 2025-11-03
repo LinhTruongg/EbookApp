@@ -23,9 +23,10 @@ import { COLORS, SIZES, COMMON_STYLES } from '../../constants';
  * - Clear error messages
  */
 
-interface PDFViewerProps {
+export interface PDFViewerProps {
   pdfUrl: string;
   bookTitle: string;
+  initialPage?: number;
   onClose: () => void;
   onPageChange?: (page: number, totalPages: number) => void;
   onLoadComplete?: (totalPages: number) => void;
@@ -35,6 +36,7 @@ interface PDFViewerProps {
 const PDFViewer: React.FC<PDFViewerProps> = ({
   pdfUrl,
   bookTitle,
+  initialPage = 1,
   onClose,
   onPageChange,
   onLoadComplete,
@@ -413,7 +415,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({
         // PDF.js viewer using base64 data
         const pdfBase64 = '${base64Data}';
         let pdfDoc = null;
-        let currentPage = 1;
+        let currentPage = ${initialPage};
         let baseScale = 1.5;
         let scale = baseScale;
         let nightMode = false;

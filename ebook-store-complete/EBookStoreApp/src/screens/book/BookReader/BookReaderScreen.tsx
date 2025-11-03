@@ -37,7 +37,7 @@ interface ReadingSession {
 
 export default function BookReaderScreen() {
   const router = useRouter();
-  const { id: bookId } = useLocalSearchParams<{ id: string }>();
+  const { id: bookId, page } = useLocalSearchParams<{ id: string; page?: string }>();
   const sessionRef = useRef<ReadingSession | null>(null);
   const progressUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -46,7 +46,7 @@ export default function BookReaderScreen() {
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   // Reading progress state
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(page ? parseInt(page, 10) : 1);
   const [totalPages, setTotalPages] = useState(0);
   const [readingProgress, setReadingProgress] = useState(0);
 
@@ -372,6 +372,7 @@ export default function BookReaderScreen() {
       <PDFViewer
         pdfUrl={pdfUrl}
         bookTitle={book.title}
+        initialPage={currentPage}
         onClose={handleClosePDF}
         onPageChange={handlePageChange}
         onLoadComplete={handleLoadComplete}

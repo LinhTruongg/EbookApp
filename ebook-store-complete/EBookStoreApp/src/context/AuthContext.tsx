@@ -369,7 +369,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'UPDATE_USER', payload: user });
   };
 
-  const forgotPassword = async (email: string): Promise<void> => {
+  const forgotPassword = async (email: string): Promise<any> => {
     try {
       const response = await simpleApiService.forgotPassword(email);
       if (response.success) {
@@ -378,6 +378,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           text1: 'Password Reset',
           text2: response.message,
         });
+        return response;
       } else {
         throw new Error(response.message);
       }
@@ -386,6 +387,30 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       Toast.show({
         type: 'error',
         text1: 'Password Reset Failed',
+        text2: errorMessage,
+      });
+      throw error;
+    }
+  };
+
+  const verifyForgotPassword = async (token: string, otpCode: string): Promise<any> => {
+    try {
+      const response = await simpleApiService.verifyForgotPassword(token, otpCode);
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'OTP Verified',
+          text2: response.message,
+        });
+        return response;
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'OTP verification failed';
+      Toast.show({
+        type: 'error',
+        text1: 'OTP Verification Failed',
         text2: errorMessage,
       });
       throw error;
@@ -481,6 +506,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateUser,
     updateProfile,
     forgotPassword,
+    verifyForgotPassword,
     resetPassword,
     changePassword,
   };

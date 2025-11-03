@@ -34,7 +34,6 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchType, setSearchType] = useState<'user' | 'book'>('user');
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -73,7 +72,7 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
 
   useEffect(() => {
     loadUsers();
-  }, [searchQuery, searchType]);
+  }, [searchQuery]);
 
   const loadUsers = async () => {
     try {
@@ -81,16 +80,13 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
       const searchParams: any = {};
       
       if (searchQuery.trim()) {
-        if (searchType === 'book') {
-          searchParams.bookTitle = searchQuery.trim();
-        } else {
-          searchParams.search = searchQuery.trim();
-        }
+        searchParams.search = searchQuery.trim();
       }
       
       const response = await apiService.getAllUsersAdmin(searchParams);
       if (response.success) {
         setUsers(response.data || []);
+        setFilteredUsers(response.data || []);
       } else {
         Alert.alert('Lỗi', response.message || 'Không thể tải danh sách người dùng');
       }
@@ -108,9 +104,6 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
     setRefreshing(false);
   };
 
-  const filterUsers = () => {
-    setFilteredUsers(users);
-  };
 
   const handleSearchChange = (text: string) => {
     setSearchQuery(text);
@@ -282,12 +275,21 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
             });
             setModalVisible(true);
           }}
+          accessibilityLabel="Sửa"
         >
           <Text style={styles.editButtonText}>Sửa</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={styles.resetPasswordButton}
+          onPress={() => handleResetPassword(item)}
+          accessibilityLabel="Reset mật khẩu"
+        >
+          <Text style={styles.resetPasswordButtonText}>Reset</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={styles.deleteButton}
           onPress={() => handleDelete(item)}
+          accessibilityLabel="Xóa"
         >
           <Text style={styles.deleteButtonText}>Xóa</Text>
         </TouchableOpacity>
@@ -309,27 +311,9 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View style={styles.searchContainer}>
-          <View style={styles.searchTypeContainer}>
-            <TouchableOpacity
-              style={[styles.searchTypeButton, searchType === 'user' && styles.activeSearchType]}
-              onPress={() => setSearchType('user')}
-            >
-              <Text style={[styles.searchTypeText, searchType === 'user' && styles.activeSearchTypeText]}>
-                Tìm theo người dùng
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.searchTypeButton, searchType === 'book' && styles.activeSearchType]}
-              onPress={() => setSearchType('book')}
-            >
-              <Text style={[styles.searchTypeText, searchType === 'book' && styles.activeSearchTypeText]}>
-                Tìm theo tên sách
-              </Text>
-            </TouchableOpacity>
-          </View>
           <TextInput
             style={styles.searchInput}
-            placeholder={searchType === 'book' ? "Tìm kiếm theo tên sách..." : "Tìm kiếm người dùng..."}
+            placeholder="Tìm kiếm người dùng..."
             value={searchQuery}
             onChangeText={handleSearchChange}
             placeholderTextColor="#999"
@@ -367,6 +351,8 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
         visible={modalVisible}
         animationType="slide"
         presentationStyle="pageSheet"
+        accessibilityViewIsModal={true}
+        accessibilityLabel="Form thêm/sửa người dùng"
       >
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
@@ -577,35 +563,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
-    gap: 12,
   },
   searchContainer: {
     flex: 1,
-  },
-  searchTypeContainer: {
-    flexDirection: 'row',
-    marginBottom: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    padding: 2,
-  },
-  searchTypeButton: {
-    flex: 1,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  activeSearchType: {
-    backgroundColor: '#007AFF',
-  },
-  searchTypeText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  activeSearchTypeText: {
-    color: '#fff',
+    marginRight: 12,
   },
   searchInput: {
     borderWidth: 1,
@@ -637,15 +598,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 16,
     marginBottom: 12,
-    borderRadius: 12,
+    borderRadius: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 2,
+    elevation: 2,
   },
   userInfo: {
     flex: 1,
@@ -703,28 +664,41 @@ const styles = StyleSheet.create({
   },
   editButton: {
     backgroundColor: '#3B82F6',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     alignItems: 'center',
-    minWidth: 60,
+    minWidth: 50,
   },
   editButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  resetPasswordButton: {
+    backgroundColor: '#F59E0B',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    minWidth: 50,
+  },
+  resetPasswordButtonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
     fontWeight: '600',
   },
   deleteButton: {
     backgroundColor: '#EF4444',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
     alignItems: 'center',
-    minWidth: 60,
+    minWidth: 50,
   },
   deleteButtonText: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
   emptyContainer: {
@@ -754,7 +728,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E2E8F0',
@@ -773,7 +747,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     flex: 1,
-    padding: 20,
+    padding: 16,
   },
   formGroup: {
     marginBottom: 16,

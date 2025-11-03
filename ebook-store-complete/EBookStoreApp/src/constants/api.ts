@@ -2,12 +2,14 @@ import { Platform } from 'react-native';
 
 // Function to get the correct localhost URL based on platform
 const getBaseUrl = () => {
-
-  process.env.EXPO_PUBLIC_API_URL
-  if (__DEV__) {
-    return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
-  return process.env.EXPO_PUBLIC_API_URL;
+  if (__DEV__) {
+    const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+    return `http://${host}:3000`;
+  }
+  return '';
 };
 
 export const API_CONFIG = {
@@ -43,6 +45,17 @@ export const API_ENDPOINTS = {
     BOOKMARKS: '/users/bookmarks',
     WISHLIST: '/users/wishlist',
     READING_SESSIONS: '/users/reading-sessions',
+  },
+  WALLET: {
+    BALANCE: '/wallet/balance',
+    TRANSACTIONS: '/wallet/transactions',
+    DEPOSIT: '/wallet/deposit',
+    DEPOSIT_STATUS: '/wallet/deposit',
+  },
+  PAYMENTS: {
+    PURCHASE_BOOK: '/payments/purchase-book',
+    REFUND: '/payments/refund',
+    HISTORY: '/payments/history',
   },
 };
 

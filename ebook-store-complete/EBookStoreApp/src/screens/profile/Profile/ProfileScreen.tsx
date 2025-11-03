@@ -198,47 +198,6 @@ function ProfileScreen() {
         </View>
       </View>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>⚡ Thao tác nhanh</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => router.push('/(tabs)/profile/edit-profile')}
-          >
-            <Text style={styles.quickActionEmoji}>✏️</Text>
-            <Text style={styles.quickActionTitle}>Chỉnh sửa</Text>
-            <Text style={styles.quickActionSubtitle}>Cập nhật thông tin</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => router.push('/(tabs)/profile/change-password')}
-          >
-            <Text style={styles.quickActionEmoji}>🔒</Text>
-            <Text style={styles.quickActionTitle}>Bảo mật</Text>
-            <Text style={styles.quickActionSubtitle}>Đổi mật khẩu</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => console.log('Settings pressed')}
-          >
-            <Text style={styles.quickActionEmoji}>⚙️</Text>
-            <Text style={styles.quickActionTitle}>Cài đặt</Text>
-            <Text style={styles.quickActionSubtitle}>Tùy chỉnh app</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.quickActionCard}
-            onPress={() => console.log('Help pressed')}
-          >
-            <Text style={styles.quickActionEmoji}>❓</Text>
-            <Text style={styles.quickActionTitle}>Trợ giúp</Text>
-            <Text style={styles.quickActionSubtitle}>Hỗ trợ & FAQ</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
       {/* Reading Progress */}
       <View style={styles.section}>
@@ -283,6 +242,13 @@ function ProfileScreen() {
 
       {/* Actions Section */}
       <View style={styles.actionsSection}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.depositButton]}
+          onPress={() => router.push('/wallet/deposit')}
+        >
+          <Text style={[styles.actionButtonText, styles.depositButtonText]}>💰 Nạp tiền</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push('/(tabs)/profile/edit-profile')}
@@ -571,6 +537,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
   },
+  depositButton: {
+    backgroundColor: COLORS.primary,
+  },
+  depositButtonText: {
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
   logoutButton: {
     backgroundColor: COLORS.error,
   },
@@ -586,43 +559,6 @@ const styles = StyleSheet.create({
     color: COLORS.error,
     textAlign: 'center',
     marginTop: 50,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  quickActionCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 15,
-    padding: 15,
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  quickActionEmoji: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  quickActionTitle: {
-    fontSize: SIZES.font.md,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  quickActionSubtitle: {
-    fontSize: SIZES.font.xs,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
   },
   progressCard: {
     backgroundColor: COLORS.white,

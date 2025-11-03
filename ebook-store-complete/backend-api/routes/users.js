@@ -87,6 +87,34 @@ router.get('/library/categorized', authenticateToken, userController.getUserLibr
 
 /**
  * @swagger
+ * /api/users/library/add:
+ *   post:
+ *     tags: [Users]
+ *     summary: Add book to user library
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - bookId
+ *             properties:
+ *               bookId:
+ *                 type: string
+ *                 description: Book ID to add to library
+ *     responses:
+ *       200:
+ *         description: Book added to library successfully
+ *       404:
+ *         description: Book not found
+ */
+router.post('/library/add', authenticateToken, userController.addToLibrary);
+
+/**
+ * @swagger
  * /api/users/wishlist:
  *   get:
  *     tags: [Users]
@@ -98,14 +126,74 @@ router.get('/wishlist', authenticateToken, userController.getUserWishlist);
 
 /**
  * @swagger
- * /api/users/reading-progress:
+ * /api/users/reading-progress/{bookId}:
  *   put:
  *     tags: [Users]
  *     summary: Update reading progress for a book
  *     security:
  *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               progress:
+ *                 type: number
+ *                 minimum: 0
+ *                 maximum: 100
+ *               pageNumber:
+ *                 type: number
+ *                 minimum: 1
  */
-router.put('/reading-progress', authenticateToken, userController.updateReadingProgress);
+router.put('/reading-progress/:bookId', authenticateToken, userController.updateReadingProgress);
+
+/**
+ * @swagger
+ * /api/users/complete-book:
+ *   post:
+ *     tags: [Users]
+ *     summary: Mark a book as completed
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               bookId:
+ *                 type: string
+ *                 description: Book ID to mark as completed
+ */
+router.post('/complete-book', authenticateToken, userController.markBookAsCompleted);
+
+/**
+ * @swagger
+ * /api/users/reading-session/{bookId}:
+ *   get:
+ *     tags: [Users]
+ *     summary: Get reading session for a book
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: bookId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Book ID
+ */
+router.get('/reading-session/:bookId', authenticateToken, userController.getReadingSession);
 
 // ===== ADMIN ROUTES =====
 

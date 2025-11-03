@@ -27,10 +27,9 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
   };
 
   const handleSuccessRedirect = () => {
-    // After successful email send, could redirect to login or stay
     setTimeout(() => {
-      router.push('/auth/login');
-    }, 3000); // Redirect after 3 seconds
+      router.push('/(auth)/login');
+    }, 1500);
   };
 
   return (

@@ -564,15 +564,48 @@ class BookController {
         isFeatured = false,
         isBestseller = false,
         isNewRelease = false,
+        isLockedByPoints = false,
+        pointsRequired = 0,
         tags,
         metadata,
         coverImage,
+        coverImageBase64,
+        coverImageName,
+        coverImageType,
+        coverImageSize,
         fileUrl,
         fileSize,
         previewUrl,
         samplePages,
         fileBase64
       } = req.body;
+
+      const toBool = (v) => {
+        if (typeof v === 'boolean') return v;
+        if (typeof v === 'string') return v.trim().toLowerCase() === 'true' || v === '1';
+        return !!v;
+      };
+      const toInt = (v, def = 0) => {
+        const n = parseInt(v);
+        return Number.isFinite(n) ? n : def;
+      };
+
+      // Normalize authorIds (can arrive as JSON string when using FormData)
+      let normalizedAuthorIds = authorIds;
+      if (typeof normalizedAuthorIds === 'string') {
+        try {
+          const parsed = JSON.parse(normalizedAuthorIds);
+          if (Array.isArray(parsed)) {
+            normalizedAuthorIds = parsed.map((id) => parseInt(id)).filter((n) => Number.isFinite(n));
+          }
+        } catch {
+          // Fallback: comma-separated values
+          normalizedAuthorIds = normalizedAuthorIds
+            .split(',')
+            .map((s) => parseInt(s.trim()))
+            .filter((n) => Number.isFinite(n));
+        }
+      }
 
       // Validate required fields
       if (!title || !description || !categoryId) {
@@ -583,12 +616,13 @@ class BookController {
       }
 
       // Validate Base64 file is provided (required for creating book)
-      if (!fileBase64) {
-        return res.status(400).json({
-          success: false,
-          message: 'Tệp sách là bắt buộc khi tạo sách mới'
-        });
-      }
+      // Temporarily disabled for testing
+      // if (!fileBase64) {
+      //   return res.status(400).json({
+      //     success: false,
+      //     message: 'Tệp sách là bắt buộc khi tạo sách mới'
+      //   });
+      // }
 
       // Check if category exists
       const category = await Category.findByPk(categoryId);
@@ -606,6 +640,40 @@ class BookController {
         bookFile = fileBase64;
       }
 
+      // Handle cover image Base64 data
+      let coverImageData = coverImage; // Use existing coverImage if provided
+      if (coverImageBase64) {
+        console.log('🖼️ [createBook] Processing cover image Base64 data');
+        try {
+          // Upload cover image to Cloudinary
+          const uploadResult = await CloudinaryUtils.uploadBase64Image(
+            coverImageBase64,
+            `books/covers/${title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
+            {
+              folder: 'books/covers',
+              resource_type: 'image',
+              format: 'jpg',
+              quality: 'auto',
+              transformation: [
+                { width: 400, height: 600, crop: 'fill', gravity: 'center' }
+              ]
+            }
+          );
+          
+          if (uploadResult && uploadResult.secure_url) {
+            coverImageData = uploadResult.secure_url;
+            console.log('✅ [createBook] Cover image uploaded successfully:', coverImageData);
+          } else {
+            console.warn('⚠️ [createBook] Cover image upload failed, using Base64 data directly');
+            coverImageData = `data:${coverImageType || 'image/jpeg'};base64,${coverImageBase64}`;
+          }
+        } catch (error) {
+          console.error('❌ [createBook] Error uploading cover image:', error);
+          // Fallback to Base64 data
+          coverImageData = `data:${coverImageType || 'image/jpeg'};base64,${coverImageBase64}`;
+        }
+      }
+
       // Create book
       const book = await Book.create({
         title,
@@ -620,9 +688,11 @@ class BookController {
         isFeatured,
         isBestseller,
         isNewRelease,
+        isLockedByPoints: toBool(isLockedByPoints),
+        pointsRequired: toInt(pointsRequired, 0),
         tags: tags ?? null,
         metadata: metadata ?? null,
-        coverImage,
+        coverImage: coverImageData,
         fileUrl,
         fileSize: fileSize ? parseInt(fileSize) : null,
         previewUrl,
@@ -634,8 +704,8 @@ class BookController {
       });
 
       // Add authors if provided
-      if (authorIds && authorIds.length > 0) {
-        await book.setAuthors(authorIds);
+      if (normalizedAuthorIds && normalizedAuthorIds.length > 0) {
+        await book.setAuthors(normalizedAuthorIds);
       }
 
       // Update category book count
@@ -694,15 +764,49 @@ class BookController {
         isFeatured,
         isBestseller,
         isNewRelease,
+        isLockedByPoints,
+        pointsRequired,
         tags,
         metadata,
         coverImage,
+        coverImageBase64,
+        coverImageName,
+        coverImageType,
+        coverImageSize,
         fileUrl,
         fileSize,
         previewUrl,
         samplePages,
         fileBase64
       } = req.body;
+
+      const toBoolU = (v) => {
+        if (v === undefined) return undefined;
+        if (typeof v === 'boolean') return v;
+        if (typeof v === 'string') return v.trim().toLowerCase() === 'true' || v === '1';
+        return !!v;
+      };
+      const toIntU = (v) => {
+        if (v === undefined) return undefined;
+        const n = parseInt(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      // Normalize authorIds
+      let normalizedAuthorIds = authorIds;
+      if (typeof normalizedAuthorIds === 'string') {
+        try {
+          const parsed = JSON.parse(normalizedAuthorIds);
+          if (Array.isArray(parsed)) {
+            normalizedAuthorIds = parsed.map((id) => parseInt(id)).filter((n) => Number.isFinite(n));
+          }
+        } catch {
+          normalizedAuthorIds = normalizedAuthorIds
+            .split(',')
+            .map((s) => parseInt(s.trim()))
+            .filter((n) => Number.isFinite(n));
+        }
+      }
 
       const book = await Book.findByPk(id);
       if (!book) {
@@ -735,6 +839,40 @@ class BookController {
         });
       }
 
+      // Handle cover image Base64 data if provided
+      let coverImageData = coverImage; // Use existing coverImage if provided
+      if (coverImageBase64) {
+        console.log('🖼️ [updateBook] Processing cover image Base64 data');
+        try {
+          // Upload cover image to Cloudinary
+          const uploadResult = await CloudinaryUtils.uploadBase64Image(
+            coverImageBase64,
+            `books/covers/${title?.replace(/[^a-zA-Z0-9]/g, '_') || book.title.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
+            {
+              folder: 'books/covers',
+              resource_type: 'image',
+              format: 'jpg',
+              quality: 'auto',
+              transformation: [
+                { width: 400, height: 600, crop: 'fill', gravity: 'center' }
+              ]
+            }
+          );
+          
+          if (uploadResult && uploadResult.secure_url) {
+            coverImageData = uploadResult.secure_url;
+            console.log('✅ [updateBook] Cover image uploaded successfully:', coverImageData);
+          } else {
+            console.warn('⚠️ [updateBook] Cover image upload failed, using Base64 data directly');
+            coverImageData = `data:${coverImageType || 'image/jpeg'};base64,${coverImageBase64}`;
+          }
+        } catch (error) {
+          console.error('❌ [updateBook] Error uploading cover image:', error);
+          // Fallback to Base64 data
+          coverImageData = `data:${coverImageType || 'image/jpeg'};base64,${coverImageBase64}`;
+        }
+      }
+
       // Update book fields
       const updateData = {};
       if (title !== undefined) updateData.title = title;
@@ -750,9 +888,14 @@ class BookController {
       if (isFeatured !== undefined) updateData.isFeatured = isFeatured;
       if (isBestseller !== undefined) updateData.isBestseller = isBestseller;
       if (isNewRelease !== undefined) updateData.isNewRelease = isNewRelease;
+      const lockedU = toBoolU(isLockedByPoints);
+      if (lockedU !== undefined) updateData.isLockedByPoints = lockedU;
+      const pointsU = toIntU(pointsRequired);
+      if (pointsU !== undefined) updateData.pointsRequired = pointsU;
       if (tags !== undefined) updateData.tags = tags ?? null;
       if (metadata !== undefined) updateData.metadata = metadata ?? null;
       if (coverImage !== undefined) updateData.coverImage = coverImage;
+      if (coverImageBase64 !== undefined) updateData.coverImage = coverImageData;
       if (fileUrl !== undefined) updateData.fileUrl = fileUrl;
       if (fileSize !== undefined) updateData.fileSize = fileSize ? parseInt(fileSize) : null;
       if (previewUrl !== undefined) updateData.previewUrl = previewUrl;
@@ -765,7 +908,7 @@ class BookController {
 
       // Update authors if provided
       if (authorIds !== undefined) {
-        await book.setAuthors(authorIds || []);
+        await book.setAuthors(normalizedAuthorIds || []);
       }
 
       // Update category book counts if category changed
@@ -899,6 +1042,24 @@ class BookController {
           success: false,
           message: 'Không tìm thấy sách'
         });
+      }
+
+      // Enforce access control for point-locked books: must be in user's library
+      try {
+        const lockedCheck = await Book.findByPk(id, { attributes: ['isLockedByPoints', 'pointsRequired'] });
+        if (lockedCheck && (lockedCheck.isLockedByPoints || (lockedCheck.pointsRequired || 0) > 0)) {
+          const userId = req.user?.id;
+          if (!userId) {
+            return res.status(401).json({ success: false, message: 'Yêu cầu đăng nhập để đọc sách' });
+          }
+          const { UserLibrary } = require('../models');
+          const lib = await UserLibrary.findOne({ where: { userId, bookId: id } });
+          if (!lib) {
+            return res.status(403).json({ success: false, message: 'Sách cần điểm để mở khóa. Vui lòng mở khóa trước khi đọc.' });
+          }
+        }
+      } catch (e) {
+        console.error('⚠️ [getBookFile] Access control check failed:', e.message);
       }
 
       if (!book.file) {

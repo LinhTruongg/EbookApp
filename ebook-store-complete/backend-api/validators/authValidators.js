@@ -72,6 +72,20 @@ const forgotPasswordValidation = [
     .normalizeEmail()
 ];
 
+const verifyForgotPasswordValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Token không được để trống'),
+  
+  body('otpCode')
+    .notEmpty()
+    .withMessage('Mã OTP không được để trống')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Mã OTP phải có đúng 6 chữ số')
+    .matches(/^\d{6}$/)
+    .withMessage('Mã OTP phải là 6 chữ số')
+];
+
 const resetPasswordValidation = [
   body('token')
     .notEmpty()
@@ -100,6 +114,7 @@ module.exports = {
   registerValidation,
   loginValidation,
   forgotPasswordValidation,
+  verifyForgotPasswordValidation,
   resetPasswordValidation,
   changePasswordValidation
 };

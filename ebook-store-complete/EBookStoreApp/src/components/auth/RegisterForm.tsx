@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
+import { useRouter } from 'expo-router';
 import { RegisterRequest } from '../../types';
 
 const RegisterForm: React.FC = () => {
@@ -30,7 +31,8 @@ const RegisterForm: React.FC = () => {
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const { register, isLoading } = useAuth();
+  const { register, logout, isLoading } = useAuth();
+  const router = useRouter();
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -90,6 +92,8 @@ const RegisterForm: React.FC = () => {
 
       console.log('Registration data:', registrationData);
       await register(registrationData);
+      await logout();
+      router.replace('/(auth)/login');
     } catch (error) {
       console.error('Registration error:', error);
     }
@@ -296,6 +300,15 @@ const RegisterForm: React.FC = () => {
           style={styles.dateInput}
           onPress={() => {
             console.log('Date input pressed, showing picker');
+            if (formData.dateOfBirth) {
+              try {
+                setSelectedDate(new Date(formData.dateOfBirth));
+              } catch (e) {
+                setSelectedDate(new Date());
+              }
+            } else {
+              setSelectedDate(new Date());
+            }
             setShowDatePicker(true);
           }}
         >
@@ -304,7 +317,7 @@ const RegisterForm: React.FC = () => {
           </Text>
           <Text style={styles.calendarIcon}>📅</Text>
         </TouchableOpacity>
-        {showDatePicker && (
+        {showDatePicker && Platform.OS === 'ios' && (
           <Modal
             transparent={true}
             animationType="slide"
@@ -335,9 +348,11 @@ const RegisterForm: React.FC = () => {
                   <TouchableOpacity
                     style={styles.confirmButton}
                     onPress={() => {
-                      const formattedDate = selectedDate.toLocaleDateString('vi-VN');
-                      const isoDate = selectedDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-                      updateFormData('dateOfBirth', isoDate);
+                      const year = selectedDate.getFullYear();
+                      const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                      const day = String(selectedDate.getDate()).padStart(2, '0');
+                      const localIsoDate = `${year}-${month}-${day}`;
+                      updateFormData('dateOfBirth', localIsoDate);
                       setShowDatePicker(false);
                     }}
                   >
@@ -347,6 +362,31 @@ const RegisterForm: React.FC = () => {
               </View>
             </View>
           </Modal>
+        )}
+
+        {showDatePicker && Platform.OS === 'android' && (
+          <DateTimePicker
+            value={selectedDate}
+            mode="date"
+            display="spinner"
+            maximumDate={new Date()}
+            minimumDate={new Date(1900, 0, 1)}
+            onChange={(event, date) => {
+              if (event.type === 'dismissed') {
+                setShowDatePicker(false);
+                return;
+              }
+              if (event.type === 'set' && date) {
+                setSelectedDate(date);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const localIsoDate = `${year}-${month}-${day}`;
+                updateFormData('dateOfBirth', localIsoDate);
+                setShowDatePicker(false);
+              }
+            }}
+          />
         )}
       </View>
 

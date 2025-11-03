@@ -74,6 +74,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.ENUM('free', 'subscription'),
       defaultValue: 'free'
     },
+    pricePaid: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      defaultValue: 0.00
+    },
     downloadCount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,

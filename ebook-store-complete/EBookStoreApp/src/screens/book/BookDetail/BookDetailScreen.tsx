@@ -11,15 +11,19 @@ import {
   Dimensions,
   TextInput,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
 import { Book, Comment, CommentsResponse, Rating, RatingStats } from '../../../types';
 import { apiService } from '../../../services/api';
+import { simpleApiService } from '../../../services/simpleApi';
+import { useAuth } from '../../../context/AuthContext';
 import { eventBus } from '../../../utils/eventBus';
 import StarRating from '../../../components/common/StarRating';
 import RatingDistributionChart from '../../../components/common/RatingDistributionChart';
 import LoadingStarRating from '../../../components/common/LoadingStarRating';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -30,6 +34,7 @@ interface BookDetailScreenProps {
 
 const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWishlist = false }) => {
   const router = useRouter();
+  const { user, updateUser } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [commentsLoading, setCommentsLoading] = useState<boolean>(false);
   const [newComment, setNewComment] = useState<string>('');
@@ -40,11 +45,116 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   const [userRating, setUserRating] = useState<Rating | null>(null);
   const [ratingStats, setRatingStats] = useState<RatingStats | null>(null);
   const [ratingLoading, setRatingLoading] = useState<boolean>(false);
+  const [wishlistLoading, setWishlistLoading] = useState<boolean>(false);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [unlockLoading, setUnlockLoading] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
+  const [requiresPoints, setRequiresPoints] = useState<boolean>((((book as any).pointsRequired ?? 0) > 0) || (book as any).isLockedByPoints);
+  const [requiredPoints, setRequiredPoints] = useState<number>(Number(((book as any).pointsRequired || 0)));
+  const userPoints = (user as any)?.points ?? 0;
 
-  const handleReadBook = () => {
-    console.log('book.id', book.id);
+  // Check if book is unlocked (in library)
+  useEffect(() => {
+    // Always refetch book detail to ensure we have latest lock flags
+    (async () => {
+      try {
+        const res = await apiService.getBookById(book.id);
+        if (res.success && res.data) {
+          const srv = res.data as any;
+          setRequiresPoints(((srv.pointsRequired ?? 0) > 0) || !!srv.isLockedByPoints);
+          setRequiredPoints(Number(srv.pointsRequired || 0));
+        }
+      } catch {}
+    })();
+
+    const checkUnlocked = async () => {
+      if (!requiresPoints) {
+        setIsUnlocked(true);
+        return;
+      }
+      try {
+        const libRes = await simpleApiService.getUserLibrary();
+        if (libRes.success && libRes.data) {
+          const allBooks = [
+            ...(libRes.data.categories?.reading || []),
+            ...(libRes.data.categories?.favorited || []),
+            ...(libRes.data.categories?.completed || []),
+          ];
+          const found = allBooks.find((item: any) => item.book?.id === book.id || item.bookId === book.id);
+          setIsUnlocked(!!found);
+        }
+      } catch (e) {
+        console.error('Error checking unlocked status:', e);
+      }
+    };
+    checkUnlocked();
+  }, [book.id, requiresPoints]);
+
+  const handlePurchaseBook = async () => {
+    if (!user) {
+      Alert.alert('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để mua sách.');
+      router.push('/(auth)/login');
+      return;
+    }
+
+    if (userPoints < requiredPoints) {
+      const shortage = requiredPoints - userPoints;
+      Alert.alert(
+        'Điểm không đủ',
+        `Bạn cần thêm ${shortage.toLocaleString('vi-VN')} điểm để mua sách này.\n\nSố điểm hiện tại: ${userPoints.toLocaleString('vi-VN')}\nSố điểm cần: ${requiredPoints.toLocaleString('vi-VN')}`,
+        [
+          { text: 'Hủy', style: 'cancel' },
+          { 
+            text: 'Nạp điểm', 
+            onPress: () => router.push('/wallet/deposit')
+          },
+        ]
+      );
+      return;
+    }
+
+    try {
+      setUnlockLoading(true);
+      const response = await apiService.purchaseBookWithPoints({ 
+        bookId: String(book.id), 
+        pricePoints: requiredPoints 
+      });
+      
+      if (response.success) {
+        // Update user points in context
+        if (response.data?.balance !== undefined && user) {
+          updateUser({ ...(user as any), points: response.data.balance } as any);
+        }
+        try {
+          await simpleApiService.addToLibrary(book.id);
+        } catch {}
+        setIsUnlocked(true);
+        Alert.alert('Thành công', 'Đã mở khóa sách thành công!');
+      }
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Không thể mua sách bằng điểm';
+      Alert.alert('Lỗi', msg);
+    } finally {
+      setUnlockLoading(false);
+    }
+  };
+
+  const handleReadBook = async () => {
+    if (requiresPoints && !isUnlocked) {
+      Alert.alert('Yêu cầu mở khóa', 'Sách này cần điểm để mở khóa. Vui lòng mua trước khi đọc.');
+      return;
+    }
+    try {
+      // Add book to library first
+      await simpleApiService.addToLibrary(book.id);
+      console.log('Book added to library successfully');
+    } catch (error) {
+      console.log('Error adding book to library (may already exist):', error);
+      // Continue anyway, book might already be in library
+    }
+    
+    console.log('Navigating to book reader:', book.id);
     router.push(`/book-reader/${book.id}`);
   };
 
@@ -93,7 +203,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
         apiService.getBookRatingStats(book.id)
       ]);
       
-      if (userRatingRes.success) {
+      if (userRatingRes.success && userRatingRes.data) {
         setUserRating(userRatingRes.data);
       }
       
@@ -148,7 +258,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
     try {
       const res = await apiService.likeComment(commentId);
       if (res.success && res.data) {
-        setComments(prev => prev.map(c => c.id === commentId ? { ...c, hasLiked: res.data.hasLiked, likesCount: res.data.likesCount } : c));
+        setComments(prev => prev.map(c => c.id === commentId ? { ...c, hasLiked: res.data?.hasLiked || false, likesCount: res.data?.likesCount || 0 } : c));
       }
     } catch (e) {
       // ignore for now
@@ -162,15 +272,29 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   }, [book.id]);
 
   const toggleWishlist = async () => {
+    if (wishlistLoading) return;
+    const prev = inWishlist;
+    const optimistic = !prev;
+    setInWishlist(optimistic);
+    eventBus.emit('wishlist:toggle', { book, inWishlist: optimistic });
+    setWishlistLoading(true);
     try {
       const res = await apiService.toggleWishlist(book.id);
       if (res.success && res.data) {
-        const next = (res.data as any).inWishlist;
-        setInWishlist(next);
-        eventBus.emit('wishlist:toggle', { book, inWishlist: next });
+        const serverState = (res.data as any).inWishlist;
+        if (serverState !== optimistic) {
+          setInWishlist(serverState);
+          eventBus.emit('wishlist:toggle', { book, inWishlist: serverState });
+        }
+      } else {
+        setInWishlist(prev);
+        eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
       }
     } catch (e) {
-      // ignore for now
+      setInWishlist(prev);
+      eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
+    } finally {
+      setWishlistLoading(false);
     }
   };
 
@@ -180,11 +304,17 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-          <Text style={styles.backButtonText}>←</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={handleGoBack}
+          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          accessibilityLabel="Quay lại"
+          accessibilityRole="button"
+        >
+          <Ionicons name="arrow-back-outline" size={26} color={COLORS.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Chi tiết sách</Text>
-        <TouchableOpacity style={styles.favoriteButton} onPress={toggleWishlist} accessibilityLabel="Yêu thích">
+        <TouchableOpacity style={styles.favoriteButton} onPress={toggleWishlist} accessibilityLabel="Yêu thích" disabled={wishlistLoading}>
           <Text style={[styles.favoriteButtonText, inWishlist && styles.favorited]}>{inWishlist ? '❤️' : '♡'}</Text>
         </TouchableOpacity>
       </View>
@@ -194,7 +324,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
         <View style={styles.bookSection}>
           <Image 
             source={{ 
-              uri: book.coverImage || 'https://via.placeholder.com/200x300/CCCCCC/FFFFFF?text=No+Image' 
+              uri: book.coverImage || 'https://placehold.co/200x300/CCCCCC/FFFFFF?text=No+Image' 
             }} 
             style={styles.bookCover} 
           />
@@ -202,22 +332,23 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
             <Text style={styles.bookTitle}>{book.title}</Text>
             <Text style={styles.bookAuthor}>{authors}</Text>
             
-            {/* Rating */}
+            {/* Rating - Simplified */}
             <View style={styles.ratingContainer}>
               {ratingLoading ? (
                 <View style={styles.ratingLoading}>
                   <ActivityIndicator size="small" color={COLORS.primary} />
-                  <Text style={styles.loadingText}>Đang tải đánh giá...</Text>
+                  <Text style={styles.loadingText}>Đang tải...</Text>
                 </View>
               ) : (
-                <View style={styles.ratingSection}>
+                <View style={styles.ratingRow}>
                   <StarRating
                     rating={ratingStats?.averageRating || book.rating || 0}
-                    size="medium"
-                    showText={true}
+                    size="small"
+                    showText={false}
                   />
                   <Text style={styles.reviewsText}>
-                    ({ratingStats?.totalRatings || book.reviewCount || 0} đánh giá)
+                    {(typeof ratingStats?.averageRating === 'number' ? ratingStats.averageRating.toFixed(1) : 
+                      typeof book.rating === 'number' ? book.rating.toFixed(1) : '0.0')} ({ratingStats?.totalRatings || book.reviewCount || 0} đánh giá)
                   </Text>
                 </View>
               )}
@@ -287,34 +418,12 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
           )}
         </View>
 
-        {/* Rating Section */}
+        {/* Rating Section - Combined Layout */}
         <View style={styles.ratingSection}>
-          <Text style={styles.sectionTitle}>Đánh giá sách</Text>
+          <Text style={styles.sectionTitle}>Đánh giá & Nhận xét</Text>
           
-          {/* Current Rating Display */}
-          <View style={styles.currentRatingContainer}>
-            <View style={styles.ratingDisplay}>
-              <StarRating
-                rating={ratingStats?.averageRating || book.rating || 0}
-                size="large"
-                showText={true}
-              />
-              <Text style={styles.ratingCount}>
-                {ratingStats?.totalRatings || book.reviewCount || 0} đánh giá
-              </Text>
-            </View>
-          </View>
-
-          {/* Rating Distribution Chart */}
-          {ratingStats && ratingStats.totalRatings > 0 && (
-            <RatingDistributionChart
-              ratingDistribution={ratingStats.ratingDistribution}
-              totalRatings={ratingStats.totalRatings}
-            />
-          )}
-
-          {/* User Rating Input */}
-          <View style={styles.userRatingContainer}>
+          {/* User Rating Input Only */}
+          <View style={styles.userRatingCard}>
             <Text style={styles.userRatingTitle}>Đánh giá của bạn</Text>
             {ratingLoading ? (
               <LoadingStarRating />
@@ -335,6 +444,17 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
               </View>
             )}
           </View>
+
+          {/* Rating Distribution Chart */}
+          {ratingStats && ratingStats.totalRatings > 0 && (
+            <View style={styles.distributionCard}>
+              <Text style={styles.distributionTitle}>Phân bố đánh giá</Text>
+              <RatingDistributionChart
+                ratingDistribution={ratingStats.ratingDistribution}
+                totalRatings={ratingStats.totalRatings}
+              />
+            </View>
+          )}
         </View>
 
       {/* Comments */}
@@ -406,7 +526,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
                 >
                   <Image 
                     source={{ 
-                      uri: suggestedBook.coverImage || 'https://via.placeholder.com/120x160/CCCCCC/FFFFFF?text=No+Image' 
+                      uri: suggestedBook.coverImage || 'https://placehold.co/120x160/CCCCCC/FFFFFF?text=No+Image'
                     }} 
                     style={styles.suggestedCover} 
                   />
@@ -429,10 +549,34 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        <TouchableOpacity style={styles.readButton} onPress={handleReadBook}>
-          <Text style={styles.readButtonText}>Đọc sách</Text>
-        </TouchableOpacity>
-        {/* Removed purchase button as this is now a free reading app */}
+        {/* Show points requirement if locked */}
+        {requiresPoints && !isUnlocked && (
+          <View style={styles.pointsBadge}>
+            <Text style={styles.pointsBadgeText}>
+              Cần {requiredPoints.toLocaleString('vi-VN')} điểm để mở khóa
+            </Text>
+          </View>
+        )}
+        
+        {requiresPoints && !isUnlocked ? (
+          <TouchableOpacity 
+            style={[styles.unlockButton, unlockLoading && styles.unlockButtonDisabled]} 
+            onPress={handlePurchaseBook}
+            disabled={unlockLoading}
+          >
+            {unlockLoading ? (
+              <ActivityIndicator color={COLORS.white} />
+            ) : (
+              <Text style={styles.readButtonText}>
+                {`Mua sách (${requiredPoints.toLocaleString('vi-VN')} điểm)`}
+              </Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.readButton} onPress={handleReadBook}>
+            <Text style={styles.readButtonText}>Đọc sách</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -453,16 +597,11 @@ const styles = StyleSheet.create({
     borderBottomColor: COLORS.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.surface,
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  backButtonText: {
-    fontSize: 20,
-    color: COLORS.text,
+    backgroundColor: 'transparent',
   },
   headerTitle: {
     fontSize: SIZES.font.lg,
@@ -470,12 +609,17 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   favoriteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   favoriteButtonText: {
     fontSize: 20,
@@ -523,10 +667,11 @@ const styles = StyleSheet.create({
   ratingContainer: {
     marginBottom: SIZES.spacing.sm,
   },
-  ratingSection: {
+  ratingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SIZES.spacing.sm,
+    flexWrap: 'wrap',
   },
   ratingText: {
     fontSize: SIZES.font.sm,
@@ -536,6 +681,8 @@ const styles = StyleSheet.create({
   reviewsText: {
     fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   ratingLoading: {
     flexDirection: 'row',
@@ -548,7 +695,7 @@ const styles = StyleSheet.create({
     borderTopColor: COLORS.border,
     backgroundColor: '#FAFAFA',
   },
-  currentRatingContainer: {
+  userRatingCard: {
     backgroundColor: COLORS.white,
     borderRadius: 16,
     padding: 20,
@@ -558,26 +705,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
-  },
-  ratingDisplay: {
     alignItems: 'center',
-    gap: 8,
-  },
-  ratingCount: {
-    fontSize: SIZES.font.md,
-    color: COLORS.textSecondary,
-    fontWeight: '500',
-  },
-  userRatingContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 20,
-    marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
   },
   userRatingTitle: {
     fontSize: SIZES.font.lg,
@@ -586,12 +714,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  distributionCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  distributionTitle: {
+    fontSize: SIZES.font.lg,
+    fontWeight: '600',
+    color: COLORS.text,
+    marginBottom: 16,
+  },
   ratingInputContainer: {
     alignItems: 'center',
-    gap: SIZES.spacing.md,
+    gap: SIZES.spacing.sm,
   },
   ratingStatusText: {
-    fontSize: SIZES.font.md,
+    fontSize: SIZES.font.sm,
     color: '#4CAF50',
     fontWeight: '600',
     textAlign: 'center',
@@ -758,24 +902,60 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   actionButtons: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     padding: SIZES.spacing.lg,
     gap: SIZES.spacing.md,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    backgroundColor: COLORS.white,
+    zIndex: 20,
+    elevation: 20,
+  },
+  pointsBadge: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+    borderRadius: 8,
+  },
+  pointsBadgeText: {
+    color: '#C2410C',
+    fontWeight: '600',
   },
   readButton: {
     flex: 1,
     backgroundColor: COLORS.primary,
-    paddingVertical: SIZES.spacing.md,
+    paddingVertical: SIZES.spacing.lg,
     borderRadius: SIZES.borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 52,
+    width: '100%',
+  },
+  readButtonDisabled: {
+    backgroundColor: COLORS.textSecondary,
+    opacity: 0.6,
+  },
+  unlockButton: {
+    flex: 1,
+    backgroundColor: COLORS.success,
+    paddingVertical: SIZES.spacing.lg,
+    borderRadius: SIZES.borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+    width: '100%',
+  },
+  unlockButtonDisabled: {
+    backgroundColor: '#22c55e99',
   },
   readButtonText: {
-    fontSize: SIZES.font.md,
-    fontWeight: '600',
+    fontSize: SIZES.font.lg,
+    fontWeight: 'bold',
+    lineHeight: SIZES.font.lg + 4,
     color: COLORS.white,
+    textAlign: 'center',
   },
   purchaseButton: {
     flex: 1,

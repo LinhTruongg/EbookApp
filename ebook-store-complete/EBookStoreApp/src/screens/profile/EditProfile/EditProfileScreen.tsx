@@ -9,7 +9,9 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../context/AuthContext';
 import { COLORS, SIZES } from '../../../constants';
@@ -28,6 +30,8 @@ export default function EditProfileScreen() {
     gender: '',
     address: '',
   });
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -39,6 +43,7 @@ export default function EditProfileScreen() {
         gender: user.gender || '',
         address: user.address || '',
       });
+      setAvatarPreview(user.avatar || null);
     }
   }, [user]);
 
@@ -77,9 +82,11 @@ export default function EditProfileScreen() {
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender as 'male' | 'female' | 'other' | undefined,
         address: formData.address,
+        avatarBase64: avatarBase64 || undefined,
       };
 
       await updateProfile(updateData);
+      setAvatarBase64(null);
       
       router.push('/(tabs)/profile');
     } catch (error) {
@@ -88,6 +95,37 @@ export default function EditProfileScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const pickAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Cần quyền', 'Vui lòng cấp quyền truy cập thư viện ảnh.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets?.length) {
+        const asset = result.assets[0];
+        setAvatarPreview(asset.uri);
+        setAvatarBase64(asset.base64 || null);
+      }
+    } catch (e) {
+      Alert.alert('Lỗi', 'Không thể chọn ảnh.');
+    }
+  };
+
+  const removeAvatar = () => {
+    setAvatarPreview(null);
+    setAvatarBase64(''); // signal clearing avatar when saving
   };
 
   const formatDateForInput = (dateString: string) => {
@@ -125,10 +163,29 @@ export default function EditProfileScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView style={styles.scrollView}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Cập nhật thông tin</Text>
+        <View style={styles.avatarSection}>
+          <TouchableOpacity onPress={pickAvatar}>
+            {avatarPreview ? (
+              <Image source={{ uri: avatarPreview }} style={styles.avatar} />
+            ) : (
+              <View style={styles.defaultAvatar}>
+                <Text style={styles.defaultAvatarText}>
+                  {user.firstName?.[0]?.toUpperCase()}{user.lastName?.[0]?.toUpperCase()}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={styles.avatarActions}>
+            <TouchableOpacity style={[styles.smallButton, styles.primaryButton]} onPress={pickAvatar}>
+              <Text style={styles.smallButtonText}>Chọn ảnh</Text>
+            </TouchableOpacity>
+            {avatarPreview && (
+              <TouchableOpacity style={[styles.smallButton, styles.outlineButton]} onPress={removeAvatar}>
+                <Text style={styles.outlineButtonText}>Xóa</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
-
         <View style={styles.form}>
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Họ *</Text>
@@ -258,6 +315,59 @@ const styles = StyleSheet.create({
   },
   form: {
     padding: 20,
+  },
+  avatarSection: {
+    alignItems: 'center',
+    paddingTop: 20,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+  },
+  defaultAvatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: COLORS.primary,
+  },
+  defaultAvatarText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
+  avatarActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  smallButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  primaryButton: {
+    backgroundColor: COLORS.primary,
+  },
+  smallButtonText: {
+    color: COLORS.white,
+    fontWeight: '600',
+  },
+  outlineButton: {
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  outlineButtonText: {
+    color: COLORS.text,
+    fontWeight: '600',
   },
   inputGroup: {
     marginBottom: 20,

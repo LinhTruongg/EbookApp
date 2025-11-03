@@ -35,7 +35,8 @@ module.exports = {
       },
       price_paid: {
         type: Sequelize.DECIMAL(10, 2),
-        allowNull: false
+        allowNull: true,
+        defaultValue: 0.00
       },
       order_id: {
         type: Sequelize.INTEGER,

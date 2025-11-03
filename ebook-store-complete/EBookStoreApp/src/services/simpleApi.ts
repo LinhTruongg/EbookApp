@@ -3,10 +3,16 @@ import { Platform } from 'react-native';
 
 // Simple API configuration
 const getApiUrl = () => {
-  if (__DEV__) {
-    return process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api';
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.endsWith('/api')
+      ? process.env.EXPO_PUBLIC_API_URL
+      : `${process.env.EXPO_PUBLIC_API_URL}/api`;
   }
-  return process.env.EXPO_PUBLIC_API_URL;
+  if (__DEV__) {
+    const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
+    return `http://${host}:3000/api`;
+  }
+  return '';
 };
 
 class SimpleApiService {
@@ -172,11 +178,23 @@ class SimpleApiService {
   async getUserLibrary() {
     try {
       console.log('🔵 SimpleApiService.getUserLibrary called');
-      const response = await this.axiosInstance.get('/users/library');
+      const response = await this.axiosInstance.get('/users/library/categorized');
       console.log('✅ SimpleApiService.getUserLibrary success:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ SimpleApiService.getUserLibrary error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async addToLibrary(bookId: string) {
+    try {
+      console.log('🔵 SimpleApiService.addToLibrary called with bookId:', bookId);
+      const response = await this.axiosInstance.post('/users/library/add', { bookId });
+      console.log('✅ SimpleApiService.addToLibrary success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.addToLibrary error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -224,6 +242,11 @@ class SimpleApiService {
       console.log('✅ SimpleApiService.logout success:', response.data);
       return response.data;
     } catch (error: any) {
+      // If backend doesn't implement logout, ignore 404 and proceed with local cleanup
+      if (error?.response?.status === 404) {
+        console.warn('⚠️ /auth/logout not implemented on server; proceeding with local logout.');
+        return { success: true, message: 'Logged out locally' } as any;
+      }
       console.error('❌ SimpleApiService.logout error:', error.response?.data || error.message);
       throw error;
     }
@@ -249,6 +272,18 @@ class SimpleApiService {
       return response.data;
     } catch (error: any) {
       console.error('❌ SimpleApiService.forgotPassword error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async verifyForgotPassword(token: string, otpCode: string) {
+    try {
+      console.log('🔵 SimpleApiService.verifyForgotPassword called');
+      const response = await this.axiosInstance.post('/auth/verify-forgot-password', { token, otpCode });
+      console.log('✅ SimpleApiService.verifyForgotPassword success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.verifyForgotPassword error:', error.response?.data || error.message);
       throw error;
     }
   }
@@ -292,11 +327,52 @@ class SimpleApiService {
   async updateProfile(userData: any) {
     try {
       console.log('🔵 SimpleApiService.updateProfile called with:', userData);
-      const response = await this.axiosInstance.put('/auth/profile', userData);
+      const response = await this.axiosInstance.put('/users/profile', userData);
       console.log('✅ SimpleApiService.updateProfile success:', response.data);
       return response.data;
     } catch (error: any) {
       console.error('❌ SimpleApiService.updateProfile error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async updateReadingProgress(bookId: string, currentPage: number, totalPages: number) {
+    try {
+      console.log('🔵 SimpleApiService.updateReadingProgress called with:', { bookId, currentPage, totalPages });
+      const response = await this.axiosInstance.put(`/users/reading-progress/${bookId}`, {
+        progress: Math.round((currentPage / totalPages) * 100),
+        pageNumber: currentPage
+      });
+      console.log('✅ SimpleApiService.updateReadingProgress success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.updateReadingProgress error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async markBookAsCompleted(bookId: string) {
+    try {
+      console.log('🔵 SimpleApiService.markBookAsCompleted called with:', bookId);
+      const response = await this.axiosInstance.post('/users/complete-book', {
+        bookId
+      });
+      console.log('✅ SimpleApiService.markBookAsCompleted success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.markBookAsCompleted error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async getReadingSession(bookId: string) {
+    try {
+      console.log('🔵 SimpleApiService.getReadingSession called with:', bookId);
+      const response = await this.axiosInstance.get(`/users/reading-session/${bookId}`);
+      console.log('✅ SimpleApiService.getReadingSession success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.getReadingSession error:', error.response?.data || error.message);
       throw error;
     }
   }

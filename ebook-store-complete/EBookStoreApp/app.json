@@ -36,6 +36,13 @@
         {
           "sitemap": true
         }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.example",
+          "enableGooglePay": true
+        }
       ]
     ]
   }

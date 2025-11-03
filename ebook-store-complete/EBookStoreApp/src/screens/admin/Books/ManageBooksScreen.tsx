@@ -14,9 +14,11 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../../services/api';
 import { Book, Category, Author } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
@@ -59,6 +61,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     isFeatured: false,
     isBestseller: false,
     isNewRelease: false,
+    isLockedByPoints: false,
+    pointsRequired: '0',
   });
 
   const [selectedFile, setSelectedFile] = useState<{
@@ -68,7 +72,16 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     type: string;
   } | null>(null);
 
+  const [selectedCoverImage, setSelectedCoverImage] = useState<{
+    name: string;
+    uri: string;
+    size: number;
+    type: string;
+  } | null>(null);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
+  const [authorsDropdownOpen, setAuthorsDropdownOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -90,6 +103,16 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         isBestseller: route.params.editBook.isBestseller || false,
         isNewRelease: route.params.editBook.isNewRelease || false,
       });
+      
+      // Set existing cover image if available
+      if (route.params.editBook.coverImage) {
+        setSelectedCoverImage({
+          name: `cover_${route.params.editBook.id}.jpg`,
+          uri: route.params.editBook.coverImage,
+          size: 0,
+          type: 'image/jpeg',
+        });
+      }
       setModalVisible(true);
     }
   }, [route?.params?.editBook]);
@@ -105,9 +128,10 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
   const loadData = async () => {
     try {
       setLoading(true);
-      const [booksResponse, categoriesResponse] = await Promise.all([
+      const [booksResponse, categoriesResponse, authorsResponse] = await Promise.all([
         apiService.getAllBooksAdmin(),
         apiService.getAllCategories(),
+        apiService.getAllAuthorsAdmin(),
       ]);
 
       if (booksResponse.success) {
@@ -116,6 +140,10 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
 
       if (categoriesResponse.success) {
         setCategories(categoriesResponse.data || []);
+      }
+
+      if (authorsResponse.success) {
+        setAuthors(authorsResponse.data || []);
       }
     } catch (error) {
       console.error('Load data error:', error);
@@ -186,6 +214,51 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     }
   };
 
+  const pickCoverImage = async () => {
+    try {
+      console.log('🖼️ Opening image picker...');
+
+      // Request permission
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (permissionResult.granted === false) {
+        Alert.alert('⚠️ Cần quyền truy cập', 'Cần quyền truy cập thư viện ảnh để chọn ảnh bìa sách.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [3, 4], // Tỷ lệ 3:4 cho ảnh bìa sách
+        quality: 0.8,
+        base64: false,
+      });
+
+      console.log('🖼️ Image picker result:', JSON.stringify(result, null, 2));
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        console.log('✅ Image selected:', asset);
+
+        setSelectedCoverImage({
+          name: `cover_${Date.now()}.jpg`,
+          uri: asset.uri,
+          size: asset.fileSize || 0,
+          type: 'image/jpeg',
+        });
+
+        Alert.alert('✅ Thành công', 'Đã chọn ảnh bìa sách');
+      } else if (result.canceled) {
+        console.log('❌ User cancelled image picker');
+      } else {
+        console.warn('⚠️ Unexpected image picker result:', result);
+        Alert.alert('⚠️ Lỗi', 'Không thể xử lý ảnh. Vui lòng thử lại.');
+      }
+    } catch (error) {
+      console.error('❌ Image picker error:', error);
+      Alert.alert('❌ Lỗi', `Không thể chọn ảnh. Lỗi: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   const resetForm = () => {
     setFormData({
       title: '',
@@ -201,8 +274,11 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
       isFeatured: false,
       isBestseller: false,
       isNewRelease: false,
+      isLockedByPoints: false,
+      pointsRequired: '0',
     });
     setSelectedFile(null);
+    setSelectedCoverImage(null);
     setEditingBook(null);
     setValidationErrors({});
   };
@@ -245,6 +321,14 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
       errors.push('• Tiêu đề sách phải có ít nhất 1 ký tự');
     }
     
+    // Validate points when locked by points
+    if (formData.isLockedByPoints) {
+      const pts = Number(formData.pointsRequired || '0');
+      if (!Number.isFinite(pts) || pts < 0) {
+        errors.push('• Số điểm yêu cầu phải là số không âm');
+      }
+    }
+
     // Validate ISBN format if provided
     if (formData.isbn.trim() && (formData.isbn.trim().length < 10 || formData.isbn.trim().length > 20)) {
       errors.push('• ISBN phải từ 10-20 ký tự');
@@ -332,6 +416,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         submitData.append('isFeatured', formData.isFeatured.toString());
         submitData.append('isBestseller', formData.isBestseller.toString());
         submitData.append('isNewRelease', formData.isNewRelease.toString());
+        submitData.append('isLockedByPoints', formData.isLockedByPoints.toString());
+        submitData.append('pointsRequired', String(Number(formData.pointsRequired || '0')));
 
         // Add file - IMPORTANT: For React Native/Expo FormData
         // Must send file as a proper file object with uri, type, and name
@@ -384,6 +470,42 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         submitData.append('fileType', selectedFile.type);
         submitData.append('fileSize', selectedFile.size.toString());
 
+        // Add cover image if selected
+        if (selectedCoverImage) {
+          console.log('🖼️ Adding cover image to FormData');
+          try {
+            let coverImageBase64: string;
+            if (selectedCoverImage.uri.startsWith('blob:')) {
+              // Handle web blob
+              const response = await fetch(selectedCoverImage.uri);
+              const blobData = await response.blob();
+              const reader = new FileReader();
+              coverImageBase64 = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blobData);
+              });
+            } else {
+              // For React Native
+              coverImageBase64 = await FileSystem.readAsStringAsync(selectedCoverImage.uri, {
+                encoding: 'base64',
+              });
+            }
+            
+            submitData.append('coverImageBase64', coverImageBase64);
+            submitData.append('coverImageName', selectedCoverImage.name);
+            submitData.append('coverImageType', selectedCoverImage.type);
+            submitData.append('coverImageSize', selectedCoverImage.size.toString());
+            console.log('✅ Cover image added to FormData');
+          } catch (error) {
+            console.error('❌ Error reading cover image:', error);
+            Alert.alert('⚠️ Cảnh báo', 'Không thể đọc ảnh bìa. Sách sẽ được tạo không có ảnh bìa.');
+          }
+        }
+
         console.log('✅ FormData prepared with Base64 file data');
         console.log('📋 FormData entries:');
         for (const [key, value] of (submitData as any).entries()) {
@@ -412,7 +534,46 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
           isFeatured: formData.isFeatured,
           isBestseller: formData.isBestseller,
           isNewRelease: formData.isNewRelease,
+          isLockedByPoints: formData.isLockedByPoints,
+          pointsRequired: Number(formData.pointsRequired || '0'),
         };
+
+        // Add cover image if selected (for JSON data, we'll need to handle it differently)
+        if (selectedCoverImage) {
+          console.log('🖼️ Adding cover image to JSON data');
+          try {
+            let coverImageBase64: string;
+            if (selectedCoverImage.uri.startsWith('blob:')) {
+              // Handle web blob
+              const response = await fetch(selectedCoverImage.uri);
+              const blobData = await response.blob();
+              const reader = new FileReader();
+              coverImageBase64 = await new Promise((resolve, reject) => {
+                reader.onload = () => {
+                  const base64 = (reader.result as string).split(',')[1];
+                  resolve(base64);
+                };
+                reader.onerror = reject;
+                reader.readAsDataURL(blobData);
+              });
+            } else {
+              // For React Native
+              coverImageBase64 = await FileSystem.readAsStringAsync(selectedCoverImage.uri, {
+                encoding: 'base64',
+              });
+            }
+            
+            (submitData as any).coverImageBase64 = coverImageBase64;
+            (submitData as any).coverImageName = selectedCoverImage.name;
+            (submitData as any).coverImageType = selectedCoverImage.type;
+            (submitData as any).coverImageSize = selectedCoverImage.size.toString();
+            console.log('✅ Cover image added to JSON data');
+          } catch (error) {
+            console.error('❌ Error reading cover image:', error);
+            Alert.alert('⚠️ Cảnh báo', 'Không thể đọc ảnh bìa. Sách sẽ được tạo không có ảnh bìa.');
+          }
+        }
+
         console.log('✅ JSON data prepared:', submitData);
       }
 
@@ -522,6 +683,19 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               isBestseller: item.isBestseller || false,
               isNewRelease: item.isNewRelease || false,
             });
+            
+            // Set existing cover image if available
+            if (item.coverImage) {
+              setSelectedCoverImage({
+                name: `cover_${item.id}.jpg`,
+                uri: item.coverImage,
+                size: 0,
+                type: 'image/jpeg',
+              });
+            } else {
+              setSelectedCoverImage(null);
+            }
+            
             setModalVisible(true);
           }}
         >
@@ -615,6 +789,47 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.formGroup}>
+              <Text style={styles.label}>🖼️ Ảnh bìa sách</Text>
+              <TouchableOpacity
+                style={styles.filePickerButton}
+                onPress={pickCoverImage}
+              >
+                <Text style={styles.filePickerButtonText}>
+                  {selectedCoverImage ? `✅ ${selectedCoverImage.name}` : '🖼️ Chọn ảnh bìa sách'}
+                </Text>
+              </TouchableOpacity>
+              {selectedCoverImage && (
+                <View style={styles.coverImageContainer}>
+                  <Image
+                    source={{ uri: selectedCoverImage.uri }}
+                    style={styles.coverImagePreview}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.fileInfoContainer}>
+                    <Text style={styles.fileInfoText}>
+                      🖼️ {selectedCoverImage.name}
+                    </Text>
+                    <Text style={styles.fileInfoText}>
+                      📦 {selectedCoverImage.size > 0 ? `${(selectedCoverImage.size / (1024 * 1024)).toFixed(2)} MB` : 'Kích thước không xác định'}
+                    </Text>
+                    <Text style={styles.fileInfoText}>
+                      🏷️ {selectedCoverImage.type || 'Loại file không xác định'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        console.log('❌ Removing selected cover image');
+                        setSelectedCoverImage(null);
+                      }}
+                      style={styles.removeFileButton}
+                    >
+                      <Text style={styles.removeFileButtonText}>Xóa ảnh bìa</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.formGroup}>
               <Text style={styles.label}>Tiêu đề *</Text>
               <TextInput
                 style={[
@@ -698,35 +913,91 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
 
             <View style={styles.formGroup}>
               <Text style={styles.label}>Danh mục *</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category.id}
-                    style={[
-                      styles.categoryChip,
-                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChip,
-                      validationErrors.categoryId && styles.categoryChipError
-                    ]}
-                    onPress={() => {
-                      setFormData({ ...formData, categoryId: String((category as any).id) });
-                      if (validationErrors.categoryId) {
-                        setValidationErrors({...validationErrors, categoryId: ''});
-                      }
-                    }}
-                  >
-                    <Text style={[
-                      styles.categoryChipText,
-                      String(formData.categoryId) === String((category as any).id) && styles.selectedCategoryChipText
-                    ]}>
-                      {category.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
+              <TouchableOpacity
+                style={styles.selectBox}
+                onPress={() => setCategoryDropdownOpen(!categoryDropdownOpen)}
+              >
+                <Text style={styles.selectBoxText}>
+                  {(() => {
+                    const c = categories.find(c => String((c as any).id) === String(formData.categoryId));
+                    return c ? c.name : 'Chọn danh mục...';
+                  })()}
+                </Text>
+              </TouchableOpacity>
+              {categoryDropdownOpen && (
+                <View style={styles.dropdownContainer}>
+                  <ScrollView style={{ maxHeight: 200 }}>
+                    {categories.map((item) => {
+                      const selected = String(formData.categoryId) === String((item as any).id);
+                      return (
+                        <TouchableOpacity
+                          key={String((item as any).id)}
+                          style={[styles.dropdownItem, selected && styles.dropdownItemSelected]}
+                          onPress={() => {
+                            setFormData({ ...formData, categoryId: String((item as any).id) });
+                            if (validationErrors.categoryId) setValidationErrors({ ...validationErrors, categoryId: '' });
+                            setCategoryDropdownOpen(false);
+                          }}
+                        >
+                          <Text style={styles.dropdownItemText}>{item.name}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
               {validationErrors.categoryId && (
                 <Text style={styles.errorText}>{validationErrors.categoryId}</Text>
               )}
             </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>Tác giả</Text>
+              <TouchableOpacity
+                style={styles.selectBox}
+                onPress={() => setAuthorsDropdownOpen(!authorsDropdownOpen)}
+              >
+                <Text style={styles.selectBoxText}>
+                  {formData.authorIds.length === 0
+                    ? 'Chọn tác giả...'
+                    : `${formData.authorIds.length} tác giả đã chọn`}
+                </Text>
+              </TouchableOpacity>
+              {authorsDropdownOpen && (
+                <View style={styles.dropdownContainer}>
+                  <ScrollView style={{ maxHeight: 240 }}>
+                    {authors.map((item) => {
+                      const id = String((item as any).id);
+                      const selected = formData.authorIds.includes(id);
+                      return (
+                        <TouchableOpacity
+                          key={id}
+                          style={[styles.dropdownItem, selected && styles.dropdownItemSelected]}
+                          onPress={() => {
+                            const next = selected
+                              ? formData.authorIds.filter(aid => aid !== id)
+                              : [...formData.authorIds, id];
+                            setFormData({ ...formData, authorIds: next });
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <View>
+                              <Text style={styles.dropdownItemText}>{item.name}</Text>
+                              {!!item.nationality && <Text style={styles.dropdownItemSub}>{item.nationality}</Text>}
+                            </View>
+                            <Text style={{ color: selected ? '#007AFF' : '#9CA3AF', fontWeight: '700' }}>{selected ? '✓' : '+'}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TouchableOpacity style={styles.dropdownDoneButton} onPress={() => setAuthorsDropdownOpen(false)}>
+                    <Text style={styles.dropdownDoneText}>Đóng</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
 
             <View style={styles.formRow}>
               <View style={[styles.formGroup, styles.halfWidth]}>
@@ -784,6 +1055,25 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
                   onValueChange={(value) => setFormData({ ...formData, isNewRelease: value })}
                 />
               </View>
+              <View style={styles.switchContainer}>
+                <Text style={styles.switchLabel}>Điểm yêu cầu</Text>
+                <Switch
+                  value={formData.isLockedByPoints}
+                  onValueChange={(value) => setFormData({ ...formData, isLockedByPoints: value })}
+                />
+              </View>
+              {formData.isLockedByPoints && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Số điểm yêu cầu</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={formData.pointsRequired}
+                    onChangeText={(text) => setFormData({ ...formData, pointsRequired: text.replace(/[^0-9]/g, '') })}
+                    keyboardType="numeric"
+                    placeholder="0"
+                  />
+                </View>
+              )}
             </View>
 
             <View style={styles.formGroup}>
@@ -822,6 +1112,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
                 </View>
               )}
             </View>
+
+            
 
             <TouchableOpacity
               style={[styles.submitButton, isSubmitting && styles.disabledSubmitButton]}
@@ -1085,6 +1377,52 @@ const styles = StyleSheet.create({
   selectedCategoryChipText: {
     color: '#FFFFFF',
   },
+  selectBox: {
+    borderWidth: 1,
+    borderColor: '#D1D5DB',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+  },
+  selectBoxText: {
+    fontSize: 16,
+    color: '#374151',
+  },
+  dropdownContainer: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  dropdownItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#EFF6FF',
+  },
+  dropdownItemText: {
+    fontSize: 16,
+    color: '#111827',
+  },
+  dropdownItemSub: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  dropdownDoneButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  dropdownDoneText: {
+    color: '#007AFF',
+    fontWeight: '700',
+    fontSize: 16,
+  },
   switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1155,6 +1493,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#374151',
     marginVertical: 4,
+  },
+  coverImageContainer: {
+    marginTop: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  coverImagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+    marginBottom: 8,
   },
   removeFileButton: {
     marginTop: 8,

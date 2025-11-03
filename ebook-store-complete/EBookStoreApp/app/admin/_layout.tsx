@@ -23,10 +23,9 @@ export default function AdminLayout() {
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="books" />
       <Stack.Screen name="categories" />
+      <Stack.Screen name="authors" />
       <Stack.Screen name="users" />
-      <Stack.Screen name="reviews" />
       <Stack.Screen name="comments" />
-      <Stack.Screen name="analytics" />
     </Stack>
   );
 }
