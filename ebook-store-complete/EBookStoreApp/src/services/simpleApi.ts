@@ -60,10 +60,36 @@ class SimpleApiService {
       });
       
       console.log('✅ SimpleApiService.login success:', response.data);
+      
+      // Validate response structure
+      if (response && response.data) {
       return response.data;
+      } else {
+        console.error('❌ Invalid response structure:', response);
+        throw new Error('Invalid response from server');
+      }
     } catch (error: any) {
-      console.error('❌ SimpleApiService.login error:', error.response?.data || error.message);
+      console.error('❌ SimpleApiService.login error:', {
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        code: error?.code
+      });
+      
+      // Re-throw with better error structure
+      if (error?.response?.data) {
+        // Server returned an error response
+        const serverError = new Error(error.response.data.message || 'Login failed');
+        (serverError as any).response = error.response;
+        (serverError as any).status = error.response.status;
+        throw serverError;
+      } else if (error?.message) {
+        // Network or other error
       throw error;
+      } else {
+        // Unknown error
+        throw new Error('An unexpected error occurred during login');
+      }
     }
   }
 

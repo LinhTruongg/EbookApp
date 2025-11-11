@@ -23,7 +23,7 @@ interface SearchBarProps {
 
 const SearchBar: React.FC<SearchBarProps> = ({
   onBookSelect,
-  placeholder = "Tìm kiếm sách, tác giả...",
+  placeholder = "Tìm kiếm sách",
   showHistory = true,
   style
 }) => {
@@ -48,11 +48,9 @@ const SearchBar: React.FC<SearchBarProps> = ({
     
     try {
       const response = await apiService.searchBooks(query);
-      
-      if (response.success && response.data) {
-        setSearchResults(response.data || []);
-        
-        // Add to search history
+      const books = (response?.data as any)?.books || [];
+      if (response.success) {
+        setSearchResults(Array.isArray(books) ? books : []);
         if (showHistory && !searchHistory.includes(query.trim())) {
           setSearchHistory(prev => [query.trim(), ...prev.slice(0, 4)]);
         }
@@ -245,7 +243,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                   <FlatList
                     data={searchResults}
                     renderItem={renderSearchResultItem}
-                    keyExtractor={(item) => item.id}
+                    keyExtractor={(item) => String((item as any).id)}
                     showsVerticalScrollIndicator={false}
                   />
                 ) : (

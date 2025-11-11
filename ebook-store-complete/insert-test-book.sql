@@ -38,3 +38,5 @@ INSERT INTO books (
 
 INSERT INTO book_authors (book_id, author_id, role) VALUES (LAST_INSERT_ID(), 1, 'author');
 
+
+

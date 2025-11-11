@@ -102,6 +102,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         isFeatured: route.params.editBook.isFeatured || false,
         isBestseller: route.params.editBook.isBestseller || false,
         isNewRelease: route.params.editBook.isNewRelease || false,
+        isLockedByPoints: (route.params.editBook as any).isLockedByPoints || false,
+        pointsRequired: (route.params.editBook as any).pointsRequired?.toString() || '0',
       });
       
       // Set existing cover image if available
@@ -682,6 +684,8 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               isFeatured: item.isFeatured || false,
               isBestseller: item.isBestseller || false,
               isNewRelease: item.isNewRelease || false,
+              isLockedByPoints: (item as any).isLockedByPoints || false,
+              pointsRequired: (item as any).pointsRequired?.toString() || '0',
             });
             
             // Set existing cover image if available
@@ -730,7 +734,7 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm sách..."
+            placeholder="Tìm kiếm sách"
             value={searchQuery}
             onChangeText={handleSearchChange}
             placeholderTextColor="#999"
@@ -1333,6 +1337,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formGroup: {
+    marginBottom: 16,
+  },
+  inputGroup: {
     marginBottom: 16,
   },
   formRow: {

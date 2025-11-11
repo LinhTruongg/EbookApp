@@ -257,6 +257,7 @@ export interface AuthContextType {
   updateUser: (user: User) => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
   forgotPassword: (email: string) => Promise<void>;
+  verifyForgotPassword: (token: string, otpCode: string) => Promise<void>;
   resetPassword: (token: string, password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }

@@ -8,14 +8,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StatusBar,
-  Dimensions,
   TextInput,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { COLORS, SIZES } from '../../../constants';
-import { Book, Comment, CommentsResponse, Rating, RatingStats } from '../../../types';
+import { Book, Comment, Rating, RatingStats } from '../../../types';
 import { apiService } from '../../../services/api';
 import { simpleApiService } from '../../../services/simpleApi';
 import { useAuth } from '../../../context/AuthContext';
@@ -25,14 +24,13 @@ import RatingDistributionChart from '../../../components/common/RatingDistributi
 import LoadingStarRating from '../../../components/common/LoadingStarRating';
 import { Ionicons } from '@expo/vector-icons';
 
-const { width: screenWidth } = Dimensions.get('window');
-
 interface BookDetailScreenProps {
   book: Book;
   initialInWishlist?: boolean;
+  initialIsUnlocked?: boolean;
 }
 
-const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWishlist = false }) => {
+const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWishlist = false, initialIsUnlocked = false }) => {
   const router = useRouter();
   const { user, updateUser } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -46,7 +44,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   const [ratingStats, setRatingStats] = useState<RatingStats | null>(null);
   const [ratingLoading, setRatingLoading] = useState<boolean>(false);
   const [wishlistLoading, setWishlistLoading] = useState<boolean>(false);
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(false);
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(!!initialIsUnlocked);
   const [unlockLoading, setUnlockLoading] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
@@ -61,14 +59,21 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       try {
         const res = await apiService.getBookById(book.id);
         if (res.success && res.data) {
-          const srv = res.data as any;
-          setRequiresPoints(((srv.pointsRequired ?? 0) > 0) || !!srv.isLockedByPoints);
-          setRequiredPoints(Number(srv.pointsRequired || 0));
+          const srvBook = ((res.data as any).book ?? res.data) as any;
+          const srvPointsRequired = Number(srvBook?.pointsRequired || 0);
+          const srvLocked = Boolean(srvBook?.isLockedByPoints);
+          setRequiresPoints((srvPointsRequired > 0) || srvLocked);
+          setRequiredPoints(srvPointsRequired);
         }
-      } catch {}
+      } catch (e: any) {
+        // Silently handle error - use initial book data
+      }
     })();
 
     const checkUnlocked = async () => {
+      if (isUnlocked) {
+        return;
+      }
       if (!requiresPoints) {
         setIsUnlocked(true);
         return;
@@ -84,17 +89,21 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
           const found = allBooks.find((item: any) => item.book?.id === book.id || item.bookId === book.id);
           setIsUnlocked(!!found);
         }
-      } catch (e) {
-        console.error('Error checking unlocked status:', e);
+      } catch (e: any) {
+        // Silently handle error - assume not unlocked
       }
     };
     checkUnlocked();
-  }, [book.id, requiresPoints]);
+  }, [book.id]);
 
   const handlePurchaseBook = async () => {
     if (!user) {
       Alert.alert('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để mua sách.');
-      router.push('/(auth)/login');
+      try {
+        router.push('/(auth)/login');
+      } catch (e: any) {
+        // Silently handle navigation error
+      }
       return;
     }
 
@@ -107,7 +116,13 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
           { text: 'Hủy', style: 'cancel' },
           { 
             text: 'Nạp điểm', 
-            onPress: () => router.push('/wallet/deposit')
+            onPress: () => {
+              try {
+                router.push('/wallet/deposit');
+              } catch (e: any) {
+                // Silently handle navigation error
+              }
+            }
           },
         ]
       );
@@ -122,13 +137,28 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       });
       
       if (response.success) {
-        // Update user points in context
-        if (response.data?.balance !== undefined && user) {
-          updateUser({ ...(user as any), points: response.data.balance } as any);
+        if ((response as any).data?.alreadyOwned) {
+          setRequiresPoints(false);
+          setRequiredPoints(0);
+          setIsUnlocked(true);
+          Alert.alert('Thông báo', 'Bạn đã sở hữu sách này.');
+          return;
         }
+        // Update user points in context
+        try {
+          const balRes = await apiService.getWalletBalance();
+          if (balRes.success && balRes.data && user) {
+            updateUser({ ...(user as any), points: balRes.data.balance } as any);
+          }
+        } catch (e: any) {}
         try {
           await simpleApiService.addToLibrary(book.id);
-        } catch {}
+        } catch (e: any) {
+          // Silently handle - book might already be in library
+        }
+        // After unlocking, book is no longer locked by points
+        setRequiresPoints(false);
+        setRequiredPoints(0);
         setIsUnlocked(true);
         Alert.alert('Thành công', 'Đã mở khóa sách thành công!');
       }
@@ -148,22 +178,27 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
     try {
       // Add book to library first
       await simpleApiService.addToLibrary(book.id);
-      console.log('Book added to library successfully');
-    } catch (error) {
-      console.log('Error adding book to library (may already exist):', error);
-      // Continue anyway, book might already be in library
+    } catch (e: any) {
+      // Silently handle - book might already be in library, continue anyway
     }
     
-    console.log('Navigating to book reader:', book.id);
-    router.push(`/book-reader/${book.id}`);
+    try {
+      router.push(`/book-reader/${book.id}`);
+    } catch (e: any) {
+      // Silently handle navigation error
+    }
   };
 
   const handleGoBack = () => {
-    const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
-    if (canGoBack) {
-      router.back();
-    } else {
-      router.replace('/');
+    try {
+      const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
+      if (canGoBack) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+    } catch (e: any) {
+      // Silently handle navigation error
     }
   };
 
@@ -174,8 +209,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       if (res.success && res.data) {
         setComments(res.data.comments);
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - keep empty comments array
     } finally {
       setCommentsLoading(false);
     }
@@ -188,8 +223,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       if (res.success && res.data) {
         setSuggestedBooks(res.data);
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - keep empty suggested books array
     } finally {
       setSuggestedLoading(false);
     }
@@ -210,8 +245,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       if (ratingStatsRes.success && ratingStatsRes.data) {
         setRatingStats(ratingStatsRes.data);
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - use default rating values
     } finally {
       setRatingLoading(false);
     }
@@ -224,13 +259,17 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       if (res.success && res.data) {
         setUserRating(res.data);
         // Reload rating stats to update average
-        const statsRes = await apiService.getBookRatingStats(book.id);
-        if (statsRes.success && statsRes.data) {
-          setRatingStats(statsRes.data);
+        try {
+          const statsRes = await apiService.getBookRatingStats(book.id);
+          if (statsRes.success && statsRes.data) {
+            setRatingStats(statsRes.data);
+          }
+        } catch (e: any) {
+          // Silently handle error updating stats
         }
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - rating change may have failed
     } finally {
       setRatingLoading(false);
     }
@@ -247,8 +286,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
         // Prepend new comment
         setComments(prev => [res.data as unknown as Comment, ...prev]);
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - comment posting failed
     } finally {
       setPosting(false);
     }
@@ -260,8 +299,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
       if (res.success && res.data) {
         setComments(prev => prev.map(c => c.id === commentId ? { ...c, hasLiked: res.data?.hasLiked || false, likesCount: res.data?.likesCount || 0 } : c));
       }
-    } catch (e) {
-      // ignore for now
+    } catch (e: any) {
+      // Silently handle error - like action may have failed
     }
   };
 
@@ -290,7 +329,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
         setInWishlist(prev);
         eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
       }
-    } catch (e) {
+    } catch (e: any) {
+      // Revert to previous state on error
       setInWishlist(prev);
       eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
     } finally {
@@ -522,7 +562,13 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
                 <TouchableOpacity 
                   key={suggestedBook.id} 
                   style={styles.suggestedItem}
-                  onPress={() => router.push(`/book-detail/${suggestedBook.id}`)}
+                  onPress={() => {
+                    try {
+                      router.push(`/book-detail/${suggestedBook.id}`);
+                    } catch (e: any) {
+                      // Silently handle navigation error
+                    }
+                  }}
                 >
                   <Image 
                     source={{ 
@@ -549,29 +595,27 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
 
       {/* Action Buttons */}
       <View style={styles.actionButtons}>
-        {/* Show points requirement if locked */}
-        {requiresPoints && !isUnlocked && (
-          <View style={styles.pointsBadge}>
-            <Text style={styles.pointsBadgeText}>
-              Cần {requiredPoints.toLocaleString('vi-VN')} điểm để mở khóa
-            </Text>
-          </View>
-        )}
-        
         {requiresPoints && !isUnlocked ? (
-          <TouchableOpacity 
-            style={[styles.unlockButton, unlockLoading && styles.unlockButtonDisabled]} 
-            onPress={handlePurchaseBook}
-            disabled={unlockLoading}
-          >
-            {unlockLoading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <Text style={styles.readButtonText}>
-                {`Mua sách (${requiredPoints.toLocaleString('vi-VN')} điểm)`}
+          <>
+            <View style={styles.pointsBadge}>
+              <Text style={styles.pointsBadgeText}>
+                Cần {requiredPoints.toLocaleString('vi-VN')} điểm để mở khóa
               </Text>
-            )}
-          </TouchableOpacity>
+            </View>
+            <TouchableOpacity 
+              style={[styles.unlockButton, unlockLoading && styles.unlockButtonDisabled]} 
+              onPress={handlePurchaseBook}
+              disabled={unlockLoading}
+            >
+              {unlockLoading ? (
+                <ActivityIndicator color={COLORS.white} />
+              ) : (
+                <Text style={styles.readButtonText}>
+                  Mở khóa ({requiredPoints.toLocaleString('vi-VN')} điểm)
+                </Text>
+              )}
+            </TouchableOpacity>
+          </>
         ) : (
           <TouchableOpacity style={styles.readButton} onPress={handleReadBook}>
             <Text style={styles.readButtonText}>Đọc sách</Text>
@@ -654,10 +698,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   bookSubtitle: {
-    fontSize: SIZES.font.md,
-    color: COLORS.textSecondary,
-    marginBottom: SIZES.spacing.sm,
-    lineHeight: 20,
+    // removed unused style
   },
   bookAuthor: {
     fontSize: SIZES.font.md,
@@ -674,9 +715,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   ratingText: {
-    fontSize: SIZES.font.sm,
-    color: COLORS.accent,
-    marginRight: SIZES.spacing.xs,
+    // removed unused style
   },
   reviewsText: {
     fontSize: SIZES.font.sm,
@@ -749,19 +788,13 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
   },
   priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SIZES.spacing.sm,
+    // removed unused style
   },
   currentPrice: {
-    fontSize: SIZES.font.xl,
-    fontWeight: '700',
-    color: COLORS.primary,
+    // removed unused style
   },
   originalPrice: {
-    fontSize: SIZES.font.md,
-    color: COLORS.textSecondary,
-    textDecorationLine: 'line-through',
+    // removed unused style
   },
   detailsSection: {
     padding: SIZES.spacing.lg,
@@ -934,8 +967,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   readButtonDisabled: {
-    backgroundColor: COLORS.textSecondary,
-    opacity: 0.6,
+    // removed unused style
   },
   unlockButton: {
     flex: 1,
@@ -958,17 +990,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   purchaseButton: {
-    flex: 1,
-    backgroundColor: COLORS.primary,
-    paddingVertical: SIZES.spacing.md,
-    borderRadius: SIZES.borderRadius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
+    // removed unused style
   },
   purchaseButtonText: {
-    fontSize: SIZES.font.md,
-    fontWeight: '600',
-    color: COLORS.white,
+    // removed unused style
   },
   suggestedSection: {
     padding: SIZES.spacing.lg,

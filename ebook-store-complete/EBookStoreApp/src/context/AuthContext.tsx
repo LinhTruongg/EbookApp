@@ -211,11 +211,21 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.log('🔵 Response.success:', response.success, typeof response.success);
       console.log('🔵 Response.data:', response.data);
       
-      if (response.success) {
+      if (response && response.success && response.data) {
         console.log('🎯 Response validation passed, proceeding with auth save...');
+        
+        // Validate required fields
+        if (!response.data.token || !response.data.user) {
+          console.error('❌ Missing required fields in response:', { 
+            hasToken: !!response.data.token, 
+            hasUser: !!response.data.user 
+          });
+          throw new Error('Invalid response from server');
+        }
+        
         // Save auth data to AsyncStorage
         await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, response.data.token);
-        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken);
+        await AsyncStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.data.refreshToken || '');
         await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.data.user));
         console.log('🎯 Auth data saved successfully');
         
@@ -229,29 +239,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         console.log('🎯 Auth state updated');
         console.log('🎯 Should now be authenticated: isAuthenticated should be TRUE');
         
+        try {
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
-          text2: response.message,
+            text2: response.message || 'Đăng nhập thành công',
         });
+        } catch (toastError) {
+          console.warn('⚠️ Toast.show error:', toastError);
+        }
+        
         console.log('✅ AuthContext.login successful - ALL STEPS COMPLETED');
         
         // Return user data for navigation logic
         return response.data.user;
       } else {
-        console.log('❌ Response.success is false:', response.success);
-        console.log('❌ Response message:', response.message);
-        throw new Error(response.message || 'Login failed');
+        console.log('❌ Response.success is false or invalid:', { 
+          success: response?.success, 
+          hasData: !!response?.data 
+        });
+        const errorMsg = response?.message || 'Login failed';
+        throw new Error(errorMsg);
       }
     } catch (error: any) {
       console.error('❌ AuthContext.login error:', error);
       dispatch({ type: 'AUTH_LOADING', payload: false });
-      const errorMessage = error.response?.data?.message || error.message || 'Login failed';
+      
+      // Safely extract error message
+      let errorMessage = 'Login failed';
+      try {
+        if (error?.response?.data?.message) {
+          errorMessage = error.response.data.message;
+        } else if (error?.message) {
+          errorMessage = error.message;
+        }
+      } catch (msgError) {
+        console.warn('⚠️ Error extracting message:', msgError);
+      }
+      
+      // Safely show toast
+      try {
       Toast.show({
         type: 'error',
         text1: 'Login Failed',
         text2: errorMessage,
       });
+      } catch (toastError) {
+        console.warn('⚠️ Toast.show error:', toastError);
+      }
+      
       throw error;
     }
   };

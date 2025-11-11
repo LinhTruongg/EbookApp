@@ -1,5 +1,15 @@
 require('dotenv').config();
 
+// Debug: Log environment variables (hide password)
+console.log('🔍 Database Config Debug:', {
+  DB_USERNAME: process.env.DB_USERNAME || 'NOT SET',
+  DB_PASSWORD: process.env.DB_PASSWORD ? '***SET***' : 'NOT SET',
+  DB_NAME: process.env.DB_NAME || 'NOT SET',
+  DB_HOST: process.env.DB_HOST || 'NOT SET',
+  DB_PORT: process.env.DB_PORT || 'NOT SET',
+  NODE_ENV: process.env.NODE_ENV || 'development'
+});
+
 module.exports = {
   development: {
     username: process.env.DB_USERNAME || 'root',

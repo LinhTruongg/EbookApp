@@ -268,6 +268,19 @@ module.exports = (sequelize, DataTypes) => {
     metadata: {
       type: DataTypes.JSON,
       defaultValue: {}
+    },
+    isLockedByPoints: {
+      type: DataTypes.BOOLEAN,
+      field: 'is_locked_by_points',
+      defaultValue: false
+    },
+    pointsRequired: {
+      type: DataTypes.INTEGER,
+      field: 'points_required',
+      defaultValue: 0,
+      validate: {
+        min: { args: [0], msg: 'Điểm yêu cầu không thể âm' }
+      }
     }
   }, {
     sequelize,
@@ -281,6 +294,7 @@ module.exports = (sequelize, DataTypes) => {
       { fields: ['is_bestseller'] },
       { fields: ['is_new_release'] },
       { fields: ['title'] },
+      { fields: ['is_locked_by_points'], name: 'idx_books_locked_points' },
       // Full-text search index for title and description
       {
         name: 'book_search_index',

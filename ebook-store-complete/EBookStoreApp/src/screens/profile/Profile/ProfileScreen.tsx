@@ -218,28 +218,6 @@ function ProfileScreen() {
         </View>
       </View>
 
-      {/* Achievements */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>🏆 Thành tích</Text>
-        <View style={styles.achievementsContainer}>
-          <View style={styles.achievementItem}>
-            <Text style={styles.achievementEmoji}>📚</Text>
-            <Text style={styles.achievementTitle}>Đọc giả mới</Text>
-            <Text style={styles.achievementDescription}>Đọc 5 cuốn sách đầu tiên</Text>
-          </View>
-          <View style={styles.achievementItem}>
-            <Text style={styles.achievementEmoji}>🔥</Text>
-            <Text style={styles.achievementTitle}>Streak 7 ngày</Text>
-            <Text style={styles.achievementDescription}>Đọc liên tục 7 ngày</Text>
-          </View>
-          <View style={styles.achievementItem}>
-            <Text style={styles.achievementEmoji}>⭐</Text>
-            <Text style={styles.achievementTitle}>Đánh giá viên</Text>
-            <Text style={styles.achievementDescription}>Đánh giá 10 cuốn sách</Text>
-          </View>
-        </View>
-      </View>
-
       {/* Actions Section */}
       <View style={styles.actionsSection}>
         <TouchableOpacity
@@ -588,38 +566,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
     textAlign: 'center',
-  },
-  achievementsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  achievementItem: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 15,
-    width: '48%',
-    alignItems: 'center',
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: COLORS.gray50,
-  },
-  achievementEmoji: {
-    fontSize: 20,
-    marginBottom: 8,
-  },
-  achievementTitle: {
-    fontSize: SIZES.font.sm,
-    fontWeight: '500',
-    color: COLORS.text,
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  achievementDescription: {
-    fontSize: SIZES.font.xs,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 16,
   },
   // Avatar Modal Styles
   modalOverlay: {

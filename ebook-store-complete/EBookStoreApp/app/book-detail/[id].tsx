@@ -11,6 +11,7 @@ export default function BookDetail() {
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [inWishlist, setInWishlist] = useState<boolean>(false);
+  const [isOwned, setIsOwned] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function BookDetail() {
           setBook(response.data.book);
           if ((response.data as any).userInfo) {
             setInWishlist(!!(response.data as any).userInfo.isInWishlist);
+            setIsOwned(!!(response.data as any).userInfo.isOwned);
           }
         }
       } catch (err) {
@@ -54,5 +56,5 @@ export default function BookDetail() {
       </View>
     );
   }
-  return <BookDetailScreen book={book} initialInWishlist={inWishlist} />;
+  return <BookDetailScreen book={book} initialInWishlist={inWishlist} initialIsUnlocked={isOwned} />;
 }

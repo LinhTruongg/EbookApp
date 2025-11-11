@@ -3,6 +3,7 @@ const router = express.Router();
 const bookController = require('../controllers/bookController');
 const { authenticateToken, optionalAuth, requireAdmin } = require('../middleware/auth');
 const CloudinaryUtils = require('../utils/cloudinaryUtils');
+const handleValidationErrors = require('../middleware/validate');
 const {
   getBookByIdValidation,
   getBooksValidation,
@@ -16,7 +17,7 @@ const {
  *     tags: [Books]
  *     summary: Get books with filtering and pagination
  */
-router.get('/', getBooksValidation, optionalAuth, bookController.getBooks);
+router.get('/', getBooksValidation, handleValidationErrors, optionalAuth, bookController.getBooks);
 
 /**
  * @swagger
@@ -25,7 +26,7 @@ router.get('/', getBooksValidation, optionalAuth, bookController.getBooks);
  *     tags: [Books]
  *     summary: Search books
  */
-router.get('/search', searchBooksValidation, optionalAuth, bookController.searchBooks);
+router.get('/search', searchBooksValidation, handleValidationErrors, optionalAuth, bookController.searchBooks);
 
 /**
  * @swagger

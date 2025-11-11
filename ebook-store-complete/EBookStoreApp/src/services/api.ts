@@ -1025,6 +1025,37 @@ class ApiService {
     return response.data as any;
   }
 
+  async getWalletTransactions(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<{
+    total: number;
+    page: number;
+    limit: number;
+    items: Array<{
+      id: number;
+      userId: number;
+      type: 'deposit' | 'purchase' | 'refund';
+      points: number;
+      balanceAfter: number;
+      bookId?: number;
+      description?: string;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+  }>> {
+    console.log('💰 Fetching wallet transactions...', params);
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    
+    const query = queryParams.toString();
+    const url = query ? `/wallet/transactions?${query}` : '/wallet/transactions';
+    const response = await this.axiosInstance.get(url);
+    console.log('✅ Wallet transactions fetched successfully');
+    return response.data;
+  }
+
   async getTransactions(params?: {
     page?: number;
     limit?: number;

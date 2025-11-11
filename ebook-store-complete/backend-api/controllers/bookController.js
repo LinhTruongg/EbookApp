@@ -187,7 +187,7 @@ class BookController {
     try {
       const { q, page = 1, limit = 12 } = req.query;
 
-      if (!q || q.length < 2) {
+      if (!q || q.trim().length < 2) {
         return res.status(400).json({
           success: false,
           message: 'Từ khóa tìm kiếm phải có ít nhất 2 ký tự'
@@ -195,21 +195,23 @@ class BookController {
       }
 
       const offset = (page - 1) * limit;
+      const searchTerm = `%${q.trim()}%`;
 
       const books = await Book.findAndCountAll({
         where: {
           [Op.or]: [
-            { title: { [Op.like]: `%${q}%` } },
-            { description: { [Op.like]: `%${q}%` } },
-            { subtitle: { [Op.like]: `%${q}%` } },
-            { tags: { [Op.like]: `%${q}%` } }
+            { title: { [Op.like]: searchTerm } },
+            { description: { [Op.like]: searchTerm } },
+            { subtitle: { [Op.like]: searchTerm } }
           ]
         },
+        attributes: { exclude: ['file'] },
         include: [
           {
             model: Category,
             as: 'category',
-            attributes: ['id', 'name', 'slug']
+            attributes: ['id', 'name', 'slug'],
+            required: false
           },
           {
             model: Author,
@@ -217,7 +219,8 @@ class BookController {
             attributes: ['id', 'name'],
             through: {
               attributes: []
-            }
+            },
+            required: false
           }
         ],
         order: [['rating', 'DESC'], ['totalReviews', 'DESC']],
@@ -242,6 +245,7 @@ class BookController {
 
     } catch (error) {
       console.error('Search books error:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi tìm kiếm sách',
@@ -674,6 +678,13 @@ class BookController {
         }
       }
 
+      // Coerce lock fields
+      const lockedFlag = toBool(isLockedByPoints);
+      const requiredPts = toInt(pointsRequired, 0);
+
+      // Auto-enforce consistency: if pointsRequired > 0, force lock
+      const finalLocked = lockedFlag || requiredPts > 0;
+
       // Create book
       const book = await Book.create({
         title,
@@ -688,8 +699,8 @@ class BookController {
         isFeatured,
         isBestseller,
         isNewRelease,
-        isLockedByPoints: toBool(isLockedByPoints),
-        pointsRequired: toInt(pointsRequired, 0),
+        isLockedByPoints: finalLocked,
+        pointsRequired: requiredPts,
         tags: tags ?? null,
         metadata: metadata ?? null,
         coverImage: coverImageData,
@@ -889,9 +900,15 @@ class BookController {
       if (isBestseller !== undefined) updateData.isBestseller = isBestseller;
       if (isNewRelease !== undefined) updateData.isNewRelease = isNewRelease;
       const lockedU = toBoolU(isLockedByPoints);
-      if (lockedU !== undefined) updateData.isLockedByPoints = lockedU;
       const pointsU = toIntU(pointsRequired);
       if (pointsU !== undefined) updateData.pointsRequired = pointsU;
+      if (lockedU !== undefined) {
+        updateData.isLockedByPoints = lockedU;
+      }
+      // Auto-enforce: if pointsRequired > 0 then lock
+      if (updateData.pointsRequired !== undefined && updateData.pointsRequired > 0) {
+        updateData.isLockedByPoints = true;
+      }
       if (tags !== undefined) updateData.tags = tags ?? null;
       if (metadata !== undefined) updateData.metadata = metadata ?? null;
       if (coverImage !== undefined) updateData.coverImage = coverImage;

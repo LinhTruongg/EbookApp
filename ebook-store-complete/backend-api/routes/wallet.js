@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('express-async-handler');
 const { authenticateToken } = require('../middleware/auth');
-const { User, Book, UserLibrary } = require('../models');
+const { User, Book, UserLibrary, WalletTransaction } = require('../models');
 
 const router = express.Router();
 
@@ -21,32 +21,86 @@ router.post('/convert', authenticateToken, asyncHandler(async (req, res) => {
   const user = await User.findByPk(req.user.id);
   user.points += pointsToAdd;
   await user.save();
+
+  try {
+    await WalletTransaction.create({
+      userId: user.id,
+      type: 'deposit',
+      points: pointsToAdd,
+      balanceAfter: user.points,
+      description: 'Nạp điểm',
+    });
+  } catch (e) {}
+
   return res.json({ success: true, data: { pointsAdded: pointsToAdd, balance: user.points } });
 }));
 
 router.post('/purchase-book', authenticateToken, asyncHandler(async (req, res) => {
-  const { bookId, pricePoints } = req.body;
-  const cost = Math.max(0, Math.floor(Number(pricePoints || 0)));
-  if (!bookId || !cost) return res.status(400).json({ success: false, message: 'Invalid payload' });
+  const { bookId } = req.body;
+  if (!bookId) return res.status(400).json({ success: false, message: 'Thiếu bookId' });
 
   const user = await User.findByPk(req.user.id);
-  if (user.points < cost) return res.status(400).json({ success: false, message: 'Số điểm không đủ' });
-
   const book = await Book.findByPk(bookId);
   if (!book) return res.status(404).json({ success: false, message: 'Không tìm thấy sách' });
 
-  // Deduct points and grant access
-  user.points -= cost;
+  // Prevent double purchase
+  const existing = await UserLibrary.findOne({ where: { userId: user.id, bookId: book.id } });
+  if (existing) {
+    return res.json({ success: true, message: 'Đã sở hữu sách này', data: { balance: user.points, alreadyOwned: true } });
+  }
+
+  // Determine cost from server-side book price
+  const serverCost = Math.max(0, Math.floor(Number(book.pointsRequired || 0)));
+
+  if (serverCost > 0) {
+    if (user.points < serverCost) return res.status(400).json({ success: false, message: 'Số điểm không đủ' });
+    user.points -= serverCost;
   await user.save();
+
+    try {
+      await WalletTransaction.create({
+        userId: user.id,
+        type: 'purchase',
+        points: -serverCost,
+        balanceAfter: user.points,
+        bookId: book.id,
+        description: `Mở khóa sách: ${book.title}`,
+      });
+    } catch (e) {}
+  }
 
   await UserLibrary.findOrCreate({
     where: { userId: user.id, bookId: book.id },
     defaults: { userId: user.id, bookId: book.id, progress: 0, status: 'purchased' }
   });
 
-  return res.json({ success: true, message: 'Mua sách thành công', data: { balance: user.points } });
+  // Note: book remains priced/locked globally; access is enforced per-user via library
+  return res.json({ success: true, message: 'Mở khóa sách thành công', data: { balance: user.points, cost: serverCost } });
 }));
 
 module.exports = router;
+
+// List wallet transactions
+router.get('/transactions', authenticateToken, asyncHandler(async (req, res) => {
+  const page = Math.max(1, Number(req.query.page || 1));
+  const limit = Math.min(50, Math.max(1, Number(req.query.limit || 20)));
+  const offset = (page - 1) * limit;
+  const where = { userId: req.user.id };
+  const { count, rows } = await WalletTransaction.findAndCountAll({
+    where,
+    order: [['createdAt', 'DESC']],
+    limit,
+    offset,
+  });
+  res.json({
+    success: true,
+    data: {
+      total: count,
+      page,
+      limit,
+      items: rows,
+    }
+  });
+}));
 
 

@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import Toast from 'react-native-toast-message';
 import { initPaymentSheet, presentPaymentSheet } from '../../utils/stripePay';
 
+const VND_TO_USD_RATE = 25000;
 const QUICK_AMOUNTS = [50000, 100000, 200000, 500000, 1000000];
 
 const PAYMENT_METHODS = [
@@ -124,8 +125,17 @@ export default function DepositScreen() {
     setIsSubmitting(true);
     try {
       if (selectedPaymentMethod === 'card') {
-        const numAmount = Math.round(parseFloat(amount));
-        const pi = await apiService.createPaymentIntent({ amount: numAmount, currency: 'usd' });
+        const numAmountVND = Math.round(parseFloat(amount));
+        const amountUSD = numAmountVND / VND_TO_USD_RATE;
+        const amountCents = Math.round(amountUSD * 100);
+        
+        if (amountCents < 50) {
+          Alert.alert('Lỗi', 'Số tiền quá nhỏ. Tối thiểu 12,500 VNĐ');
+          setIsSubmitting(false);
+          return;
+        }
+        
+        const pi = await apiService.createPaymentIntent({ amount: amountCents, currency: 'usd' });
         if (!pi.success) throw new Error('Không tạo được PaymentIntent');
 
         const init = await initPaymentSheet({
@@ -140,7 +150,7 @@ export default function DepositScreen() {
         }
 
         try {
-          const cv = await apiService.convertToPoints({ amountCents: numAmount });
+          const cv = await apiService.convertToPoints({ amountCents: numAmountVND });
           if (cv?.data?.balance !== undefined) {
             const balance = cv.data.balance as any;
             setPointsBalance(balance);
@@ -239,6 +249,15 @@ export default function DepositScreen() {
                 <Text style={styles.balanceLabel}>Số dư điểm</Text>
                 <Text style={styles.balanceAmount}>{formatCurrency(pointsBalance)} điểm</Text>
               </View>
+
+              <TouchableOpacity
+                style={styles.historyButton}
+                onPress={() => router.push('/wallet/transactions')}
+              >
+                <Text style={styles.historyButtonIcon}>📋</Text>
+                <Text style={styles.historyButtonText}>Lịch sử biến động điểm</Text>
+                <Text style={styles.historyButtonArrow}>→</Text>
+              </TouchableOpacity>
 
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Nhập số tiền</Text>
@@ -750,5 +769,28 @@ const styles = StyleSheet.create({
     ...COMMON_STYLES.textButton,
     fontSize: SIZES.font.md,
     fontWeight: '600',
+  },
+  historyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    borderRadius: SIZES.borderRadius.lg,
+    padding: SIZES.spacing.md,
+    marginBottom: SIZES.spacing.lg,
+    ...COMMON_STYLES.shadow,
+  },
+  historyButtonIcon: {
+    fontSize: SIZES.icon.lg,
+    marginRight: SIZES.spacing.md,
+  },
+  historyButtonText: {
+    flex: 1,
+    fontSize: SIZES.font.md,
+    fontWeight: '600',
+    color: COLORS.text,
+  },
+  historyButtonArrow: {
+    fontSize: SIZES.font.lg,
+    color: COLORS.textSecondary,
   },
 });

@@ -94,19 +94,42 @@ class AuthController {
       }
 
       const { email, password } = req.body;
+      console.log('🔵 Login attempt:', { email: email?.substring(0, 30), passwordLength: password?.length });
 
-      // Find user
+      // Find user - MySQL with utf8mb4_unicode_ci collation is case-insensitive
+      const { Op } = require('sequelize');
       const user = await User.findOne({ where: { email } });
+      
       if (!user) {
+        console.log('❌ User not found for email:', email);
+        // Try to find similar emails for debugging
+        try {
+          const emailPrefix = email.split('@')[0];
+          const similarUsers = await User.findAll({
+            where: {
+              email: { [Op.like]: `%${emailPrefix}%` }
+            },
+            limit: 3,
+            attributes: ['id', 'email']
+          });
+          if (similarUsers.length > 0) {
+            console.log('🔍 Similar emails found:', similarUsers.map(u => u.email));
+          }
+        } catch (debugError) {
+          console.log('Debug search error:', debugError.message);
+        }
         return res.status(401).json({
           success: false,
           message: 'Email hoặc mật khẩu không đúng'
         });
       }
 
+      console.log('✅ User found:', { id: user.id, email: user.email, isActive: user.isActive });
+
       // Check password
       const isValidPassword = await user.comparePassword(password);
       if (!isValidPassword) {
+        console.log('❌ Invalid password for user:', user.email);
         return res.status(401).json({
           success: false,
           message: 'Email hoặc mật khẩu không đúng'

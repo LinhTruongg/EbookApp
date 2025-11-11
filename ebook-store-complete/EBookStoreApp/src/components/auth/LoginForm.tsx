@@ -20,6 +20,7 @@ const LoginForm: React.FC = () => {
 
 
   const handleLogin = async () => {
+    try {
     console.log('🔵 LoginForm.handleLogin called with:', { email });
     console.log('🔵 Current environment:', __DEV__ ? 'development' : 'production');
     console.log('🔵 Window object exists:', typeof window !== 'undefined');
@@ -29,40 +30,57 @@ const LoginForm: React.FC = () => {
       return;
     }
 
-    try {
       console.log('🔵 LoginForm calling login from AuthContext...');
       const loggedInUser = await login(email, password);
       
       // Check user role and navigate accordingly
-      if (loggedInUser?.role === 'admin') {
+      if (loggedInUser && loggedInUser.role) {
+        try {
+          if (loggedInUser.role === 'admin') {
         router.push('/admin/dashboard');
         console.log('✅ Admin login successful - redirected to admin dashboard');
       } else {
         router.push('/(tabs)');
         console.log('✅ User login successful - redirected to user tabs');
+          }
+        } catch (navError: any) {
+          console.error('❌ Navigation error:', navError);
+          Alert.alert('Error', 'Login successful but navigation failed. Please try again.');
+        }
+      } else {
+        console.warn('⚠️ Logged in user missing role:', loggedInUser);
+        Alert.alert('Error', 'Login successful but user data is invalid.');
       }
     } catch (error: any) {
       console.error('❌ LoginForm login error:', error);
       console.error('❌ Error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        config: error.config?.url,
-        code: error.code
+        message: error?.message,
+        response: error?.response?.data,
+        status: error?.response?.status,
+        statusText: error?.response?.statusText,
+        config: error?.config?.url,
+        code: error?.code
       });
       
       let errorMessage = 'Invalid email or password';
       
-      if (error.response?.data?.message) {
+      try {
+        if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
-      } else if (error.message) {
+        } else if (error?.message) {
         errorMessage = error.message;
-      } else if (error.code === 'NETWORK_ERROR' || error.code === 'ECONNREFUSED') {
+        } else if (error?.code === 'NETWORK_ERROR' || error?.code === 'ECONNREFUSED') {
         errorMessage = 'Cannot connect to server. Please check your internet connection.';
+        }
+      } catch (msgError) {
+        console.warn('⚠️ Error extracting message:', msgError);
       }
       
+      try {
       Alert.alert('Login Failed', errorMessage);
+      } catch (alertError) {
+        console.error('❌ Alert.alert error:', alertError);
+      }
     }
   };
 
