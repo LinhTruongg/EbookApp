@@ -13,6 +13,7 @@ import {
 import { useAuth } from '../../../context/AuthContext';
 import { apiService } from '../../../services/api';
 import UserGrowthChart from '../../../components/admin/UserGrowthChart';
+import RevenueChart from '../../../components/admin/RevenueChart';
 
 interface AdminDashboardScreenProps {
   navigation?: any;
@@ -24,6 +25,7 @@ const DashboardContent = ({ user }: { user: any }) => {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activities, setActivities] = useState<any[]>([]);
 
   const loadDashboardStats = async () => {
     try {
@@ -42,14 +44,34 @@ const DashboardContent = ({ user }: { user: any }) => {
     }
   };
 
+  const loadRecentActivities = async () => {
+    try {
+      console.log('🔄 Loading recent activities...');
+      const response = await apiService.getRecentActivities(20);
+      console.log('📋 Activities response:', response);
+      if (response.success) {
+        console.log('✅ Activities loaded:', response.data?.length || 0, 'items');
+        setActivities(response.data || []);
+      } else {
+        console.warn('⚠️ Activities response not successful:', response.message);
+        setActivities([]);
+      }
+    } catch (error: any) {
+      console.error('❌ Error loading recent activities:', error);
+      console.error('Error details:', error.response?.data || error.message);
+      setActivities([]);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDashboardStats();
+    await Promise.all([loadDashboardStats(), loadRecentActivities()]);
     setRefreshing(false);
   };
 
   useEffect(() => {
     loadDashboardStats();
+    loadRecentActivities();
   }, []);
 
   if (loading) {
@@ -116,20 +138,26 @@ const DashboardContent = ({ user }: { user: any }) => {
     return date.toLocaleDateString('vi-VN');
   };
 
-  const recentActivities = [
-    ...stats.recentActivity.recentBooks.slice(0, 2).map((book: any) => ({
-      title: 'Sách mới được thêm',
-      description: book.title,
-      time: formatTimeAgo(book.createdAt),
-      icon: '📚'
-    })),
-    ...stats.recentActivity.recentUsers.slice(0, 2).map((user: any) => ({
-      title: 'Người dùng mới đăng ký',
-      description: user.name,
-      time: formatTimeAgo(user.createdAt),
-      icon: '👤'
-    }))
-  ];
+  const getActivityIcon = (entityType: string, action: string) => {
+    const icons: any = {
+      book: { create: '📚', update: '📝', delete: '🗑️' },
+      category: { create: '📂', update: '✏️', delete: '🗑️' },
+      author: { create: '✍️', update: '✏️', delete: '🗑️' },
+      user: { create: '👤', update: '✏️', delete: '🗑️' },
+      comment: { create: '💬', update: '✏️', delete: '🗑️' },
+      review: { create: '⭐', update: '✏️', delete: '🗑️' }
+    };
+    return icons[entityType]?.[action] || '📋';
+  };
+
+  const getActivityColor = (action: string) => {
+    const colors: any = {
+      create: '#10B981',
+      update: '#3B82F6',
+      delete: '#EF4444'
+    };
+    return colors[action] || '#6B7280';
+  };
 
   return (
     <ScrollView 
@@ -197,9 +225,14 @@ const DashboardContent = ({ user }: { user: any }) => {
         </View>
       </View>
 
-      {/* User Growth Chart - Full Width */}
-      <View style={styles.chartSection}>
-        <UserGrowthChart />
+      {/* Charts Section - Side by Side */}
+      <View style={styles.chartsRow}>
+        <View style={styles.chartWrapper}>
+          <UserGrowthChart />
+        </View>
+        <View style={styles.chartWrapper}>
+          <RevenueChart />
+        </View>
       </View>
 
       {/* Recent Activity - Bottom Section */}
@@ -207,20 +240,45 @@ const DashboardContent = ({ user }: { user: any }) => {
         <View style={styles.compactRecentActivity}>
           <Text style={styles.sectionTitle}>Hoạt động gần đây</Text>
           <View style={styles.compactActivityList}>
-            {recentActivities.slice(0, 3).map((activity, index) => (
-              <View key={index} style={styles.compactActivityItem}>
-                <View style={styles.compactActivityIcon}>
-                  <Text style={styles.compactActivityIconText}>{activity.icon}</Text>
+            {activities.length > 0 ? (
+              activities.slice(0, 10).map((activity) => (
+                <View key={activity.id} style={styles.compactActivityItem}>
+                  <View style={[
+                    styles.compactActivityIcon,
+                    { backgroundColor: `${getActivityColor(activity.action)}15` }
+                  ]}>
+                    <Text style={styles.compactActivityIconText}>
+                      {getActivityIcon(activity.entityType, activity.action)}
+                    </Text>
+                  </View>
+                  <View style={styles.compactActivityContent}>
+                    <View style={styles.compactActivityHeader}>
+                      <Text style={styles.compactActivityTitle} numberOfLines={1}>
+                        {activity.description}
+                      </Text>
+                      <View style={[
+                        styles.actionBadge,
+                        { backgroundColor: getActivityColor(activity.action) }
+                      ]}>
+                        <Text style={styles.actionBadgeText}>
+                          {activity.actionLabel}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.compactActivityDescription} numberOfLines={1}>
+                      {activity.admin.name} • {activity.entityLabel}
+                    </Text>
+                    <Text style={styles.compactActivityTime}>
+                      {formatTimeAgo(activity.createdAt)}
+                    </Text>
+                  </View>
                 </View>
-                <View style={styles.compactActivityContent}>
-                  <Text style={styles.compactActivityTitle}>{activity.title}</Text>
-                  <Text style={styles.compactActivityDescription} numberOfLines={1}>
-                    {activity.description}
-                  </Text>
-                  <Text style={styles.compactActivityTime}>{activity.time}</Text>
-                </View>
+              ))
+            ) : (
+              <View style={styles.emptyActivity}>
+                <Text style={styles.emptyActivityText}>Chưa có hoạt động nào</Text>
               </View>
-            ))}
+            )}
           </View>
         </View>
       </View>
@@ -316,6 +374,15 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '600',
   },
+  chartsRow: {
+    flexDirection: width > 768 ? 'row' : 'column',
+    gap: 16,
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  chartWrapper: {
+    flex: width > 768 ? 1 : undefined,
+  },
   chartSection: {
     marginTop: 8,
     marginBottom: 24,
@@ -378,6 +445,31 @@ const styles = StyleSheet.create({
   },
   compactActivityTime: {
     fontSize: 10,
+    color: '#94A3B8',
+  },
+  compactActivityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  actionBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  actionBadgeText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyActivity: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyActivityText: {
+    fontSize: 12,
     color: '#94A3B8',
   },
   statCardHeader: {

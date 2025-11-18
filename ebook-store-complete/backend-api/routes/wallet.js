@@ -1,5 +1,6 @@
 const express = require('express');
 const asyncHandler = require('express-async-handler');
+const { Op } = require('sequelize');
 const { authenticateToken } = require('../middleware/auth');
 const { User, Book, UserLibrary, WalletTransaction } = require('../models');
 
@@ -33,6 +34,80 @@ router.post('/convert', authenticateToken, asyncHandler(async (req, res) => {
   } catch (e) {}
 
   return res.json({ success: true, data: { pointsAdded: pointsToAdd, balance: user.points } });
+}));
+
+router.post('/deposit', authenticateToken, asyncHandler(async (req, res) => {
+  const { amount, paymentMethod } = req.body;
+  
+  if (!amount || amount <= 0) {
+    return res.status(400).json({ success: false, message: 'Số tiền không hợp lệ' });
+  }
+  
+  if (!paymentMethod) {
+    return res.status(400).json({ success: false, message: 'Phương thức thanh toán không được chỉ định' });
+  }
+
+  const user = await User.findByPk(req.user.id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng' });
+  }
+
+  const parsedAmount = Math.max(0, Math.floor(Number(amount)));
+  const transactionId = `DEP${Date.now()}${user.id}`;
+
+  if (paymentMethod === 'bank_transfer') {
+    const bankInfo = {
+      accountNumber: process.env.BANK_ACCOUNT_NUMBER || '1234567890',
+      accountName: process.env.BANK_ACCOUNT_NAME || 'EBOOK STORE',
+      bankName: process.env.BANK_NAME || 'Ngân hàng ABC',
+      amount: parsedAmount,
+      content: `NAP${transactionId}`,
+    };
+
+    return res.json({
+      success: true,
+      data: {
+        transactionId,
+        bankInfo,
+      },
+    });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      transactionId,
+      message: 'Yêu cầu nạp tiền đã được tạo. Vui lòng hoàn tất thanh toán.',
+    },
+  });
+}));
+
+router.get('/deposit/:transactionId', authenticateToken, asyncHandler(async (req, res) => {
+  const { transactionId } = req.params;
+  const user = await User.findByPk(req.user.id);
+  
+  const transaction = await WalletTransaction.findOne({
+    where: {
+      userId: user.id,
+      type: 'deposit',
+      description: { [Op.like]: `%${transactionId}%` },
+    },
+    order: [['createdAt', 'DESC']],
+  });
+
+  if (!transaction) {
+    return res.status(404).json({ success: false, message: 'Không tìm thấy giao dịch' });
+  }
+
+  return res.json({
+    success: true,
+    data: {
+      id: transaction.id,
+      status: 'completed',
+      amount: transaction.points,
+      createdAt: transaction.createdAt,
+    },
+  });
 }));
 
 router.post('/purchase-book', authenticateToken, asyncHandler(async (req, res) => {

@@ -1,6 +1,7 @@
 const { Book, Category, Author, UserLibrary, Wishlist, Review } = require('../models');
 const { Op } = require('sequelize');
 const CloudinaryUtils = require('../utils/cloudinaryUtils');
+const ActivityLogger = require('../utils/activityLogger');
 
 class BookController {
   // Get all books with filtering, sorting, and pagination
@@ -455,6 +456,11 @@ class BookController {
         ];
       }
 
+      // Validate sortBy to prevent SQL injection and ambiguous column errors
+      const allowedSortFields = ['id', 'title', 'createdAt', 'updatedAt', 'rating', 'totalReviews'];
+      const safeSortBy = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+      const safeSortOrder = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
       const books = await Book.findAndCountAll({
         where: whereClause,
         attributes: { exclude: ['file'] },
@@ -462,7 +468,8 @@ class BookController {
           {
             model: Category,
             as: 'category',
-            attributes: ['id', 'name', 'slug']
+            attributes: ['id', 'name', 'slug'],
+            required: false
           },
           {
             model: Author,
@@ -470,10 +477,11 @@ class BookController {
             attributes: ['id', 'name', 'avatar'],
             through: {
               attributes: []
-            }
+            },
+            required: false
           }
         ],
-        order: [[sortBy, sortOrder.toUpperCase()]],
+        order: [[safeSortBy, safeSortOrder]],
         limit: parseInt(limit),
         offset: parseInt(offset),
         distinct: true
@@ -492,6 +500,7 @@ class BookController {
 
     } catch (error) {
       console.error('Get all books error:', error);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi lấy danh sách sách',
@@ -741,6 +750,11 @@ class BookController {
         ]
       });
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logBookActivity(req.user.id, 'create', book.id, book.title, null, req);
+      }
+
       res.status(201).json({
         success: true,
         message: 'Tạo sách thành công',
@@ -961,6 +975,11 @@ class BookController {
         ]
       });
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logBookActivity(req.user.id, 'update', book.id, book.title, null, req);
+      }
+
       res.json({
         success: true,
         message: 'Cập nhật sách thành công',
@@ -1123,6 +1142,7 @@ class BookController {
 
       // Get category before deleting to update count
       const category = await Category.findByPk(book.categoryId);
+      const bookTitle = book.title;
       
       // Hard delete - always delete from database
       await book.destroy();
@@ -1130,6 +1150,11 @@ class BookController {
       // Update category book count
       if (category) {
         await category.updateBookCount();
+      }
+
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logBookActivity(req.user.id, 'delete', parseInt(id), bookTitle, null, req);
       }
       
       res.json({

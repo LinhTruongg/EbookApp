@@ -537,6 +537,13 @@ class ApiService {
     return response.data;
   }
 
+  async likeBook(bookId: string): Promise<ApiResponse<{ likesCount: number; hasLiked: boolean }>> {
+    console.log('❤️ Liking book:', bookId);
+    const response = await this.axiosInstance.post(`/books/${bookId}/like`);
+    console.log('✅ Book liked successfully');
+    return response.data;
+  }
+
   async updateReadingProgress(bookId: string, currentPage: number, totalPages: number): Promise<ApiResponse> {
     console.log('📊 Updating reading progress:', { bookId, currentPage, totalPages });
     const response = await this.axiosInstance.put(`/users/reading-progress/${bookId}`, {
@@ -971,6 +978,55 @@ class ApiService {
     console.log('📈 Fetching user growth statistics...');
     const response = await this.axiosInstance.get(`/admin/dashboard/user-growth?period=${period}`);
     console.log('✅ User growth statistics fetched successfully');
+    return response.data;
+  }
+
+  async getRecentActivities(limit: number = 20): Promise<ApiResponse<Array<{
+    id: number;
+    action: 'create' | 'update' | 'delete';
+    actionLabel: string;
+    entityType: 'book' | 'user' | 'category' | 'author' | 'review' | 'comment';
+    entityLabel: string;
+    entityId: number | null;
+    entityName: string | null;
+    description: string;
+    changes: any;
+    admin: {
+      id: number;
+      name: string;
+      email: string;
+      avatar: string | null;
+    };
+    createdAt: string;
+  }>>> {
+    console.log('📋 Fetching recent activities...', { limit });
+    const response = await this.axiosInstance.get(`/admin/dashboard/activities?limit=${limit}`);
+    console.log('✅ Recent activities fetched successfully');
+    return response.data;
+  }
+
+  async getRevenueStats(period: '6months' | '12months' | '24months' = '12months'): Promise<ApiResponse<{
+    period: string;
+    totalRevenue: number;
+    totalPurchases: number;
+    growthPercentage: number;
+    monthlyData: Array<{
+      month: string;
+      revenue: number;
+      purchases: number;
+    }>;
+    currentMonth: {
+      revenue: number;
+      purchases: number;
+    };
+    previousMonth: {
+      revenue: number;
+      purchases: number;
+    };
+  }>> {
+    console.log('💰 Fetching revenue statistics...');
+    const response = await this.axiosInstance.get(`/admin/dashboard/revenue?period=${period}`);
+    console.log('✅ Revenue statistics fetched successfully');
     return response.data;
   }
 

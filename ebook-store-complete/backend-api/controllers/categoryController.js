@@ -1,5 +1,6 @@
 const { Category, Book, Author } = require('../models');
 const { Op } = require('sequelize');
+const ActivityLogger = require('../utils/activityLogger');
 
 class CategoryController {
   // Get all categories
@@ -319,6 +320,11 @@ class CategoryController {
         ]
       });
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logCategoryActivity(req.user.id, 'create', category.id, category.name, null, req);
+      }
+
       res.status(201).json({
         success: true,
         message: 'Tạo danh mục thành công',
@@ -411,6 +417,11 @@ class CategoryController {
         ]
       });
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logCategoryActivity(req.user.id, 'update', category.id, category.name, null, req);
+      }
+
       res.json({
         success: true,
         message: 'Cập nhật danh mục thành công',
@@ -467,7 +478,13 @@ class CategoryController {
         });
       }
 
+      const categoryName = category.name;
       await category.destroy();
+
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logCategoryActivity(req.user.id, 'delete', parseInt(id), categoryName, null, req);
+      }
 
       res.json({
         success: true,

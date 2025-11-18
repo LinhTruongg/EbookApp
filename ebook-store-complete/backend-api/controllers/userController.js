@@ -1,6 +1,7 @@
 const { User, UserLibrary, Book, Category, Author, Wishlist, Bookmark } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
+const ActivityLogger = require('../utils/activityLogger');
 
 class UserController {
   // Get user profile
@@ -770,6 +771,11 @@ class UserController {
         verificationToken: null
       });
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logUserActivity(req.user.id, 'create', user.id, user.getFullName(), null, req);
+      }
+
       res.status(201).json({
         success: true,
         message: 'Tạo người dùng thành công',
@@ -841,6 +847,11 @@ class UserController {
 
       await user.update(updateData);
 
+      // Log admin activity
+      if (req.user && req.user.role === 'admin') {
+        await ActivityLogger.logUserActivity(req.user.id, 'update', user.id, user.getFullName(), null, req);
+      }
+
       res.json({
         success: true,
         message: 'Cập nhật người dùng thành công',
@@ -875,9 +886,17 @@ class UserController {
       const hasWishlist = await Wishlist.findOne({ where: { userId: id } });
       const hasBookmarks = await Bookmark.findOne({ where: { userId: id } });
 
+      const userName = user.getFullName();
+      
       if (hasLibrary || hasWishlist || hasBookmarks) {
         // Soft delete - just deactivate
         await user.update({ isActive: false });
+        
+        // Log admin activity
+        if (req.user && req.user.role === 'admin') {
+          await ActivityLogger.logUserActivity(req.user.id, 'update', user.id, userName, null, req);
+        }
+        
         res.json({
           success: true,
           message: 'Người dùng đã được vô hiệu hóa (có dữ liệu liên quan)'
@@ -885,6 +904,12 @@ class UserController {
       } else {
         // Hard delete
         await user.destroy();
+        
+        // Log admin activity
+        if (req.user && req.user.role === 'admin') {
+          await ActivityLogger.logUserActivity(req.user.id, 'delete', parseInt(id), userName, null, req);
+        }
+        
         res.json({
           success: true,
           message: 'Xóa người dùng thành công'

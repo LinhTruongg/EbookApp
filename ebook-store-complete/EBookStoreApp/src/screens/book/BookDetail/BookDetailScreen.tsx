@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -28,9 +28,17 @@ interface BookDetailScreenProps {
   book: Book;
   initialInWishlist?: boolean;
   initialIsUnlocked?: boolean;
+  initialHasLiked?: boolean;
+  initialLikeCount?: number;
 }
 
-const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWishlist = false, initialIsUnlocked = false }) => {
+const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ 
+  book, 
+  initialInWishlist = false, 
+  initialIsUnlocked = false,
+  initialHasLiked = false,
+  initialLikeCount = 0
+}) => {
   const router = useRouter();
   const { user, updateUser } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -46,6 +54,8 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
   const [wishlistLoading, setWishlistLoading] = useState<boolean>(false);
   const [isUnlocked, setIsUnlocked] = useState<boolean>(!!initialIsUnlocked);
   const [unlockLoading, setUnlockLoading] = useState<boolean>(false);
+  const [isLiked, setIsLiked] = useState<boolean>(initialHasLiked || book.hasLiked || false);
+  const [likeCount, setLikeCount] = useState<number>(initialLikeCount || book.likesCount || 0);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
   const [requiresPoints, setRequiresPoints] = useState<boolean>((((book as any).pointsRequired ?? 0) > 0) || (book as any).isLockedByPoints);
@@ -304,39 +314,57 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
     }
   };
 
+  const handleLike = async () => {
+    const previousState = isLiked;
+    const previousCount = likeCount;
+
+    setIsLiked(!isLiked);
+    setLikeCount(prev => isLiked ? prev - 1 : prev + 1);
+
+    try {
+      const response = await apiService.likeBook(book.id);
+      if (response.success && response.data) {
+        setLikeCount(response.data.likesCount);
+      }
+    } catch (error) {
+      setIsLiked(previousState);
+      setLikeCount(previousCount);
+      console.error('Error:', error);
+    }
+  };
+
   useEffect(() => {
     loadComments();
     loadSuggestedBooks();
     loadRatingData();
   }, [book.id]);
 
-  const toggleWishlist = async () => {
+  const toggleWishlist = useCallback(async () => {
     if (wishlistLoading) return;
-    const prev = inWishlist;
-    const optimistic = !prev;
-    setInWishlist(optimistic);
-    eventBus.emit('wishlist:toggle', { book, inWishlist: optimistic });
+
+    const previousState = inWishlist;
+
+    setInWishlist(!inWishlist);
+    eventBus.emit('wishlist:toggle', { book, inWishlist: !inWishlist });
+
     setWishlistLoading(true);
     try {
       const res = await apiService.toggleWishlist(book.id);
-      if (res.success && res.data) {
-        const serverState = (res.data as any).inWishlist;
-        if (serverState !== optimistic) {
-          setInWishlist(serverState);
-          eventBus.emit('wishlist:toggle', { book, inWishlist: serverState });
-        }
-      } else {
-        setInWishlist(prev);
-        eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
+      if (!res.success) throw new Error('Failed to toggle wishlist');
+
+      const serverState = (res.data as any)?.inWishlist;
+      if (serverState !== undefined) {
+        setInWishlist(serverState);
+        eventBus.emit('wishlist:toggle', { book, inWishlist: serverState });
       }
     } catch (e: any) {
-      // Revert to previous state on error
-      setInWishlist(prev);
-      eventBus.emit('wishlist:toggle', { book, inWishlist: prev });
+      setInWishlist(previousState);
+      eventBus.emit('wishlist:toggle', { book, inWishlist: previousState });
+      console.error('Error toggling wishlist:', e);
     } finally {
       setWishlistLoading(false);
     }
-  };
+  }, [book.id, inWishlist, wishlistLoading]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -393,6 +421,13 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({ book, initialInWish
                 </View>
               )}
             </View>
+
+            {/* Like Button */}
+            <TouchableOpacity style={styles.likeBookButton} onPress={handleLike} accessibilityLabel="Thích sách">
+              <Text style={[styles.likeBookText, isLiked && styles.likedBook]}>
+                {isLiked ? '❤️' : '🤍'} {likeCount}
+              </Text>
+            </TouchableOpacity>
 
             {/* Category */}
             {book.categories && book.categories.length > 0 && (
@@ -786,6 +821,20 @@ const styles = StyleSheet.create({
   categoryText: {
     fontSize: SIZES.font.sm,
     color: COLORS.textSecondary,
+  },
+  likeBookButton: {
+    alignSelf: 'flex-start',
+    marginTop: SIZES.spacing.sm,
+    marginBottom: SIZES.spacing.sm,
+  },
+  likeBookText: {
+    fontSize: SIZES.font.md,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  likedBook: {
+    color: '#e11d48',
+    fontWeight: '700',
   },
   priceContainer: {
     // removed unused style

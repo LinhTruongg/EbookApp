@@ -114,6 +114,7 @@ export interface BookDetailResponse {
     currentPage: number;
     isFavorite: boolean;
     purchaseDate?: string;
+    hasLiked?: boolean;
   };
 }
 
@@ -145,6 +146,8 @@ export interface Book {
   rating: number;
   reviewCount: number;
   totalReviews?: number;
+  likesCount?: number;
+  hasLiked?: boolean;
   // Removed totalPurchases and totalRevenue fields as this is now a free reading app
   categoryId?: number;
   category?: Category;

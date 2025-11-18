@@ -7,7 +7,7 @@ const getBaseUrl = () => {
   }
   if (__DEV__) {
     const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-    return `http://${host}:3000`;
+    return `http://192.168.2.25:3000`;
   }
   return '';
 };

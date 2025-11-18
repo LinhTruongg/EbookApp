@@ -1,17 +1,34 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet, ScrollView } from 'react-native';
+import RevenueChart from '../../../components/admin/RevenueChart';
+import UserGrowthChart from '../../../components/admin/UserGrowthChart';
 
 const AnalyticsScreen: React.FC = () => {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Thống kê</Text>
-    </View>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.chartsContainer}>
+        <View style={styles.chartWrapper}>
+          <RevenueChart />
+        </View>
+        <View style={styles.chartWrapper}>
+          <UserGrowthChart />
+        </View>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16 },
-  title: { fontSize: 18, fontWeight: 'bold' },
+  container: {
+    flex: 1,
+  },
+  chartsContainer: {
+    padding: 16,
+    gap: 16,
+  },
+  chartWrapper: {
+    marginBottom: 16,
+  },
 });
 
 export default AnalyticsScreen;

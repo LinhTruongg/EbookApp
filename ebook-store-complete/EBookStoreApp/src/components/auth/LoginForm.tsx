@@ -110,12 +110,6 @@ const LoginForm: React.FC = () => {
         <View style={styles.inputContainer}>
           <View style={styles.passwordHeader}>
             <Text style={styles.label}>Mật khẩu</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/(auth)/forgot-password')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.forgotPasswordText}>Quên mật khẩu?</Text>
-            </TouchableOpacity>
           </View>
           <TextInput
             style={styles.input}

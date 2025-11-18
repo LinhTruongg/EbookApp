@@ -1,5 +1,6 @@
 const { Comment, User, Book, CommentLike } = require('../models');
 const { Op } = require('sequelize');
+const ActivityLogger = require('../utils/activityLogger');
 
 // Get all comments for a book
 const getBookComments = async (req, res) => {
@@ -638,7 +639,13 @@ const adminDeleteComment = async (req, res) => {
       });
     }
 
+    const commentText = comment.content;
     await comment.destroy();
+
+    // Log admin activity
+    if (req.user && req.user.role === 'admin') {
+      await ActivityLogger.logCommentActivity(req.user.id, 'delete', parseInt(commentId), commentText, null, req);
+    }
 
     res.json({
       success: true,

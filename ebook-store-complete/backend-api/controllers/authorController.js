@@ -2,6 +2,7 @@
 
 const { Op } = require('sequelize');
 const db = require('../models');
+const ActivityLogger = require('../utils/activityLogger');
 
 const normalizeAuthor = (author) => {
   if (!author) return null;
@@ -89,6 +90,10 @@ class AuthorController {
         is_active: Boolean(isActive),
       });
 
+      if (req.user && req.user.id) {
+        await ActivityLogger.logAuthorActivity(req.user.id, 'create', created.id, created.name, null, req);
+      }
+
       return res.status(201).json({ success: true, message: 'Author created', data: normalizeAuthor(created) });
     } catch (error) {
       console.error('Author create error:', error);
@@ -113,6 +118,7 @@ class AuthorController {
         isActive,
       } = req.body;
 
+      const oldName = author.name;
       await author.update({
         name: name ?? author.name,
         bio: bio ?? author.bio,
@@ -123,6 +129,10 @@ class AuthorController {
         social_links: socialLinks !== undefined ? socialLinks : author.social_links,
         is_active: typeof isActive === 'boolean' ? isActive : author.is_active,
       });
+
+      if (req.user && req.user.id) {
+        await ActivityLogger.logAuthorActivity(req.user.id, 'update', author.id, author.name || oldName, null, req);
+      }
 
       return res.json({ success: true, message: 'Author updated', data: normalizeAuthor(author) });
     } catch (error) {
@@ -137,7 +147,13 @@ class AuthorController {
       const author = await db.Author.findByPk(id);
       if (!author) return res.status(404).json({ success: false, message: 'Author not found' });
 
+      const authorName = author.name;
       await author.destroy();
+
+      if (req.user && req.user.id) {
+        await ActivityLogger.logAuthorActivity(req.user.id, 'delete', parseInt(id), authorName, null, req);
+      }
+
       return res.json({ success: true, message: 'Author deleted' });
     } catch (error) {
       console.error('Author delete error:', error);
