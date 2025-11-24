@@ -5,6 +5,246 @@ const { validationResult } = require('express-validator');
 const nodemailer = require('nodemailer');
 
 class AuthController {
+  // Send registration OTP
+  async sendRegistrationOTP(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const { email } = req.body;
+      const normalizedEmail = email.toLowerCase();
+
+      // Check if user already exists (active user)
+      const existingUser = await User.findOne({ where: { email: normalizedEmail, isActive: true } });
+      if (existingUser) {
+        return res.status(409).json({
+          success: false,
+          message: 'Email đã được sử dụng'
+        });
+      }
+
+      // Generate 6-digit numeric code and short expiry (10 minutes)
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+      // Store OTP in a temporary way (we'll use a temporary user record or cache)
+      // For simplicity, we'll store it in a temporary user record that gets cleaned up
+      // In production, you might want to use Redis or similar
+      const tempUser = await User.findOne({ where: { email: normalizedEmail, isActive: false } });
+      
+      if (tempUser) {
+        tempUser.resetPasswordToken = otpCode;
+        tempUser.resetPasswordExpires = otpExpires;
+        await tempUser.save();
+      } else {
+        // Create a temporary record to store OTP
+        // Use a valid password that meets validation requirements (min 6 chars)
+        await User.create({
+          email: normalizedEmail,
+          firstName: 'TEMP',
+          lastName: 'TEMP',
+          password: 'TEMPORARY_PASSWORD_123',
+          resetPasswordToken: otpCode,
+          resetPasswordExpires: otpExpires,
+          isActive: false,
+          role: 'user'
+        });
+      }
+
+      // Check if email service is configured
+      const isEmailConfigured = process.env.GMAIL_USER && process.env.GMAIL_PASS;
+      
+      if (isEmailConfigured) {
+        console.log(`✅ Gmail credentials found - Email will be sent`);
+      } else {
+        console.log(`⚠️ Gmail credentials not found - Code will be logged to console only`);
+      }
+      
+      // Try to send email
+      let emailSent = false;
+      let emailError = null;
+      
+      if (isEmailConfigured) {
+        try {
+          console.log(`🔄 Starting email send process for ${normalizedEmail}...`);
+          await AuthController.prototype.sendRegistrationOTPEmail(normalizedEmail, otpCode);
+          emailSent = true;
+          console.log(`✅ Email sent successfully to ${normalizedEmail}`);
+        } catch (err) {
+          emailError = err;
+          console.error('❌ Email sending failed:', err.message);
+          
+          if (process.env.NODE_ENV === 'production') {
+            throw err;
+          }
+        }
+      }
+
+      // In development or when email is not configured, log to console
+      if (!emailSent || process.env.NODE_ENV === 'development') {
+        console.log('\n═══════════════════════════════════════════════════════════');
+        console.log('📧 REGISTRATION OTP CODE');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log(`📬 Email: ${normalizedEmail}`);
+        console.log(`🔑 OTP Code: ${otpCode}`);
+        console.log(`⏰ Expires: ${new Date(Date.now() + 10 * 60 * 1000).toLocaleString()}`);
+        console.log('═══════════════════════════════════════════════════════════\n');
+      }
+
+      // Generate registration OTP token (JWT) - expires in 10 minutes
+      const registrationOTPToken = jwt.sign(
+        { 
+          email: normalizedEmail,
+          type: 'registration_otp'
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '10m' }
+      );
+
+      const response = {
+        success: true,
+        message: emailSent 
+          ? 'Mã xác thực đã được gửi đến email của bạn'
+          : 'Mã xác thực đã được tạo. Vui lòng kiểm tra console server để lấy mã.',
+        data: {
+          token: registrationOTPToken
+        }
+      };
+
+      // In development mode, include code and error info in response for testing
+      if (process.env.NODE_ENV === 'development') {
+        if (!emailSent) {
+          response.debug = {
+            otpCode: otpCode,
+            emailConfigured: isEmailConfigured,
+            emailError: emailError ? {
+              message: emailError.message,
+              code: emailError.code,
+              responseCode: emailError.responseCode
+            } : null,
+            message: emailError 
+              ? 'Email gửi thất bại. Xem chi tiết lỗi trong emailError.'
+              : 'Email service not configured. Code displayed for development.'
+          };
+        }
+      } else if (emailError) {
+        response.message = `Mã xác thực đã được tạo nhưng không thể gửi email: ${emailError.message}`;
+      }
+
+      res.json(response);
+
+    } catch (error) {
+      console.error('Send registration OTP error:', error);
+      console.error('Error stack:', error.stack);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi gửi mã xác thực',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+        details: process.env.NODE_ENV === 'development' ? {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        } : undefined
+      });
+    }
+  }
+
+  // Verify registration OTP
+  async verifyRegistrationOTP(req, res) {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Validation errors',
+          errors: errors.array()
+        });
+      }
+
+      const { token, otpCode } = req.body;
+
+      // Decode registration OTP token
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded.type !== 'registration_otp') {
+          return res.status(400).json({
+            success: false,
+            message: 'Token không hợp lệ'
+          });
+        }
+      } catch (jwtError) {
+        return res.status(400).json({
+          success: false,
+          message: 'Token không hợp lệ hoặc đã hết hạn'
+        });
+      }
+
+      const email = decoded.email.toLowerCase();
+      const tempUser = await User.findOne({ where: { email, isActive: false } });
+      
+      if (!tempUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'Không tìm thấy mã xác thực. Vui lòng yêu cầu mã mới.'
+        });
+      }
+
+      // Verify OTP code
+      if (!tempUser.resetPasswordToken || tempUser.resetPasswordToken !== otpCode) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP không đúng'
+        });
+      }
+
+      if (!tempUser.resetPasswordExpires || tempUser.resetPasswordExpires < new Date()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Mã OTP đã hết hạn'
+        });
+      }
+
+      // Mark OTP as used and generate verify token for registration
+      tempUser.resetPasswordToken = null;
+      tempUser.resetPasswordExpires = null;
+      await tempUser.save();
+
+      // Generate verify token for registration (expires in 15 minutes)
+      const verifyToken = jwt.sign(
+        {
+          email: email,
+          type: 'registration_verify',
+          otpCode: otpCode
+        },
+        process.env.JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      res.json({
+        success: true,
+        message: 'Mã OTP đã được xác thực thành công',
+        data: {
+          token: verifyToken
+        }
+      });
+
+    } catch (error) {
+      console.error('Verify registration OTP error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Lỗi server khi xác thực mã OTP',
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      });
+    }
+  }
+
   // User registration
   async register(req, res) {
     try {
@@ -25,11 +265,48 @@ class AuthController {
         phone,
         dateOfBirth,
         gender,
-        address
+        address,
+        otpToken
       } = req.body;
 
+      // Verify OTP token if provided
+      if (otpToken) {
+        let decoded;
+        try {
+          decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
+          if (decoded.type !== 'registration_verify') {
+            return res.status(400).json({
+              success: false,
+              message: 'Token xác thực không hợp lệ'
+            });
+          }
+          if (decoded.email !== email.toLowerCase()) {
+            return res.status(400).json({
+              success: false,
+              message: 'Email không khớp với mã xác thực'
+            });
+          }
+        } catch (jwtError) {
+          return res.status(400).json({
+            success: false,
+            message: 'Token xác thực không hợp lệ hoặc đã hết hạn. Vui lòng xác thực email lại.'
+          });
+        }
+
+        // Clean up temporary user record
+        const tempUser = await User.findOne({ where: { email: email.toLowerCase(), isActive: false } });
+        if (tempUser) {
+          await tempUser.destroy();
+        }
+      } else {
+        return res.status(400).json({
+          success: false,
+          message: 'Vui lòng xác thực email trước khi đăng ký'
+        });
+      }
+
       // Check if user already exists
-      const existingUser = await User.findOne({ where: { email } });
+      const existingUser = await User.findOne({ where: { email: email.toLowerCase() } });
       if (existingUser) {
         return res.status(409).json({
           success: false,
@@ -41,21 +318,16 @@ class AuthController {
       const user = await User.create({
         firstName,
         lastName,
-        email,
+        email: email.toLowerCase(),
         password,
         phone,
         dateOfBirth,
         gender,
         address,
         role: 'user',
-        isVerified: false,
+        isVerified: true,
         verificationToken: AuthController.prototype.generateToken()
       });
-
-      // Send verification email
-      if (process.env.NODE_ENV === 'production') {
-        await AuthController.prototype.sendVerificationEmail(user.email, user.verificationToken);
-      }
 
       // Generate JWT token
       const token = AuthController.prototype.generateJWT(user);
@@ -636,6 +908,82 @@ class AuthController {
 
   async sendVerificationEmail(email, token) {
     console.log(`Verification email sent to ${email} with token: ${token}`);
+  }
+
+  async sendRegistrationOTPEmail(email, code) {
+    // Check if email credentials are configured
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+      console.warn('⚠️ Gmail credentials not found in environment variables');
+      throw new Error('Email service not configured');
+    }
+
+    console.log(`📧 Attempting to send registration OTP to ${email}...`);
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS
+      }
+    });
+
+    // Verify transporter connection
+    try {
+      await transporter.verify();
+      console.log('✅ SMTP server connection verified');
+    } catch (verifyError) {
+      console.error('❌ SMTP verification failed:', verifyError);
+      throw new Error('Không thể kết nối đến dịch vụ email. Vui lòng kiểm tra cấu hình Gmail.');
+    }
+
+    // Get sender name from env or use default
+    const senderName = process.env.EMAIL_SENDER_NAME || 'EBook Store';
+    const senderEmail = process.env.GMAIL_USER;
+
+    const mailOptions = {
+      from: {
+        name: senderName,
+        address: senderEmail
+      },
+      to: email,
+      subject: 'Mã xác thực đăng ký',
+      text: `Mã xác thực đăng ký của bạn là: ${code}. Mã có hiệu lực trong 10 phút.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #2563EB;">Xác thực đăng ký tài khoản</h2>
+          <p>Cảm ơn bạn đã đăng ký tài khoản. Vui lòng sử dụng mã xác thực sau để hoàn tất đăng ký:</p>
+          <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; text-align: center; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #6B7280;">Mã xác thực của bạn:</p>
+            <p style="font-size: 32px; font-weight: bold; color: #2563EB; margin: 10px 0; letter-spacing: 4px;">${code}</p>
+          </div>
+          <p style="color: #6B7280; font-size: 14px;">Mã này có hiệu lực trong <strong>10 phút</strong>.</p>
+          <p style="color: #6B7280; font-size: 12px; margin-top: 30px;">Nếu bạn không yêu cầu đăng ký, vui lòng bỏ qua email này.</p>
+        </div>
+      `
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Registration OTP sent successfully to ${email}`);
+      console.log(`📬 Message ID: ${info.messageId}`);
+      return info;
+    } catch (err) {
+      console.error('❌ Send registration OTP email error:', err);
+      
+      // Provide more specific error messages
+      if (err.code === 'EAUTH') {
+        throw new Error('Xác thực Gmail thất bại. Vui lòng kiểm tra GMAIL_USER và GMAIL_PASS trong file .env');
+      } else if (err.code === 'ECONNECTION') {
+        throw new Error('Không thể kết nối đến SMTP server. Vui lòng kiểm tra kết nối internet.');
+      } else if (err.responseCode === 535) {
+        throw new Error('Tài khoản Gmail không hợp lệ hoặc chưa bật "Less secure app access". Vui lòng sử dụng App Password.');
+      }
+      
+      throw new Error(`Không thể gửi email xác thực: ${err.message}`);
+    }
   }
 
   async sendPasswordResetCodeEmail(email, code) {

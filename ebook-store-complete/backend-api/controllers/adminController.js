@@ -1,4 +1,4 @@
-const { Book, User, Category, Comment, Review, UserLibrary, WalletTransaction, AdminActivity } = require('../models');
+const { Book, User, Category, Comment, Review, UserLibrary, WalletTransaction, AdminActivity, Author } = require('../models');
 const { Op } = require('sequelize');
 const ActivityLogger = require('../utils/activityLogger');
 
@@ -15,6 +15,7 @@ class AdminController {
       let totalComments = 0;
       let totalReviews = 0;
       let totalReadingSessions = 0;
+      let totalAuthors = 0;
       let newBooksLast30Days = 0;
       let newUsersLast30Days = 0;
 
@@ -72,6 +73,16 @@ class AdminController {
       }
 
       try {
+        // Get total authors count
+        totalAuthors = await Author.count({
+          where: { isActive: true }
+        });
+        console.log('✅ Total authors:', totalAuthors);
+      } catch (error) {
+        console.error('❌ Error counting authors:', error);
+      }
+
+      try {
         // Get books added in last 30 days
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -114,7 +125,8 @@ class AdminController {
           totalCategories,
           totalComments,
           totalReviews,
-          totalReadingSessions
+          totalReadingSessions,
+          totalAuthors
         },
         growth: {
           newBooksLast30Days,
@@ -157,6 +169,10 @@ class AdminController {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - monthsBack);
       startDate.setDate(1); // Start of month
+      startDate.setHours(0, 0, 0, 0);
+      
+      console.log('📈 Start date:', startDate.toISOString());
+      console.log('📈 Current date:', new Date().toISOString());
 
       // Get user growth data by month
       const userGrowthData = await User.findAll({
@@ -174,31 +190,74 @@ class AdminController {
         order: [[User.sequelize.fn('DATE_FORMAT', User.sequelize.col('created_at'), '%Y-%m'), 'ASC']],
         raw: true
       });
+      
+      console.log('📈 User growth data from DB:', userGrowthData);
 
-      // Get total users by month (cumulative)
+      // Get total users in the system (all time)
+      const totalUsersInSystem = await User.count({
+        where: { isActive: true }
+      });
+      
+      console.log('📈 Total users in system:', totalUsersInSystem);
+
+      // Get all users with their creation dates to calculate cumulative totals
+      const allUsers = await User.findAll({
+        attributes: ['id', 'createdAt'],
+        where: {
+          isActive: true
+        },
+        order: [['createdAt', 'ASC']],
+        raw: true
+      });
+      
+      console.log('📈 Total users fetched:', allUsers.length);
+
+      // Get total users before the start date (base total)
+      const baseTotalUsers = await User.count({
+        where: {
+          createdAt: {
+            [Op.lt]: startDate
+          },
+          isActive: true
+        }
+      });
+      
+      console.log('📈 Base total users (before period):', baseTotalUsers);
+
+      // Get total users by month (cumulative from beginning)
       const totalUsersByMonth = [];
-      let cumulativeTotal = 0;
-
+      
       // Generate all months in the range
       const months = [];
       const currentDate = new Date(startDate);
-      while (currentDate <= new Date()) {
+      const now = new Date();
+      while (currentDate <= now) {
         months.push(currentDate.toISOString().substring(0, 7)); // YYYY-MM format
         currentDate.setMonth(currentDate.getMonth() + 1);
       }
 
-      // Fill in the data for each month
-      months.forEach(month => {
+      // Calculate cumulative total for each month
+      let cumulativeTotal = baseTotalUsers;
+      
+      for (const month of months) {
         const monthData = userGrowthData.find(data => data.month === month);
         const newUsers = monthData ? parseInt(monthData.userCount) : 0;
+        
+        // Add new users to cumulative total
         cumulativeTotal += newUsers;
+        
+        if (month === new Date().toISOString().substring(0, 7)) {
+          console.log(`📈 Current month ${month}: newUsers=${newUsers}, cumulativeTotal=${cumulativeTotal}`);
+        }
         
         totalUsersByMonth.push({
           month: month,
           newUsers: newUsers,
           totalUsers: cumulativeTotal
         });
-      });
+      }
+      
+      console.log('📈 Total users by month:', totalUsersByMonth);
 
       // Get current month stats
       const currentMonth = new Date().toISOString().substring(0, 7);
@@ -208,26 +267,39 @@ class AdminController {
       const previousMonthStr = previousMonth.toISOString().substring(0, 7);
       const previousMonthData = totalUsersByMonth.find(data => data.month === previousMonthStr);
 
-      // Calculate growth percentage
+      // Calculate growth percentage based on newUsers (not totalUsers)
       let growthPercentage = 0;
-      if (previousMonthData && previousMonthData.totalUsers > 0) {
-        growthPercentage = ((currentMonthData?.totalUsers || 0) - previousMonthData.totalUsers) / previousMonthData.totalUsers * 100;
+      const currentMonthNewUsers = currentMonthData?.newUsers || 0;
+      const previousMonthNewUsers = previousMonthData?.newUsers || 0;
+      
+      if (previousMonthNewUsers > 0) {
+        growthPercentage = ((currentMonthNewUsers - previousMonthNewUsers) / previousMonthNewUsers) * 100;
+      } else if (currentMonthNewUsers > 0) {
+        growthPercentage = 100; // 100% growth if previous month had no new users
       }
 
       const stats = {
         period: period,
-        totalUsers: cumulativeTotal,
+        totalUsers: totalUsersInSystem,
         growthPercentage: Math.round(growthPercentage * 100) / 100,
         monthlyData: totalUsersByMonth,
         currentMonth: {
-          newUsers: currentMonthData?.newUsers || 0,
-          totalUsers: currentMonthData?.totalUsers || 0
+          newUsers: currentMonthNewUsers,
+          totalUsers: currentMonthData?.totalUsers || totalUsersInSystem
         },
         previousMonth: {
-          newUsers: previousMonthData?.newUsers || 0,
-          totalUsers: previousMonthData?.totalUsers || 0
+          newUsers: previousMonthNewUsers,
+          totalUsers: previousMonthData?.totalUsers || (totalUsersInSystem - currentMonthNewUsers)
         }
       };
+      
+      console.log('📈 Final stats:', {
+        period,
+        totalUsers: totalUsersInSystem,
+        growthPercentage: stats.growthPercentage,
+        currentMonth: stats.currentMonth,
+        previousMonth: stats.previousMonth
+      });
 
       res.json({
         success: true,
@@ -259,6 +331,10 @@ class AdminController {
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - monthsBack);
       startDate.setDate(1); // Start of month
+      startDate.setHours(0, 0, 0, 0);
+      
+      console.log('💰 Start date:', startDate.toISOString());
+      console.log('💰 Current date:', new Date().toISOString());
 
       // Get purchase transactions (revenue) grouped by month
       const { sequelize } = WalletTransaction;
@@ -278,6 +354,27 @@ class AdminController {
         order: [[sequelize.fn('DATE_FORMAT', sequelize.col('created_at'), '%Y-%m'), 'ASC']],
         raw: true
       });
+      
+      console.log('💰 Revenue data from DB:', revenueData);
+      
+      // Also get all purchase transactions for debugging
+      const allPurchases = await WalletTransaction.findAll({
+        where: {
+          type: 'purchase',
+          createdAt: {
+            [Op.gte]: startDate
+          }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+        raw: true
+      });
+      console.log('💰 Recent purchases (last 10):', allPurchases.map(p => ({
+        id: p.id,
+        points: p.points,
+        createdAt: p.created_at,
+        description: p.description
+      })));
 
       // Generate all months in the range
       const months = [];
@@ -290,12 +387,21 @@ class AdminController {
       // Fill in the data for each month
       const monthlyData = months.map(month => {
         const monthData = revenueData.find(data => data.month === month);
+        const revenue = monthData ? parseInt(monthData.revenue) || 0 : 0;
+        const purchases = monthData ? parseInt(monthData.purchases) || 0 : 0;
+        
+        if (month === new Date().toISOString().substring(0, 7)) {
+          console.log(`💰 Current month ${month}: revenue=${revenue}, purchases=${purchases}`);
+        }
+        
         return {
           month: month,
-          revenue: monthData ? parseInt(monthData.revenue) || 0 : 0,
-          purchases: monthData ? parseInt(monthData.purchases) || 0 : 0
+          revenue: revenue,
+          purchases: purchases
         };
       });
+      
+      console.log('💰 Monthly data:', monthlyData);
 
       // Calculate total revenue and purchases
       const totalRevenue = monthlyData.reduce((sum, item) => sum + item.revenue, 0);

@@ -8,8 +8,28 @@ const {
   forgotPasswordValidation,
   verifyForgotPasswordValidation,
   resetPasswordValidation,
-  changePasswordValidation
+  changePasswordValidation,
+  sendRegistrationOTPValidation,
+  verifyRegistrationOTPValidation
 } = require('../validators/authValidators');
+
+/**
+ * @swagger
+ * /api/auth/send-registration-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Send registration OTP
+ */
+router.post('/send-registration-otp', sendRegistrationOTPValidation, authController.sendRegistrationOTP);
+
+/**
+ * @swagger
+ * /api/auth/verify-registration-otp:
+ *   post:
+ *     tags: [Authentication]
+ *     summary: Verify registration OTP
+ */
+router.post('/verify-registration-otp', verifyRegistrationOTPValidation, authController.verifyRegistrationOTP);
 
 /**
  * @swagger
@@ -28,6 +48,7 @@ const {
  *               - lastName
  *               - email
  *               - password
+ *               - otpToken
  *             properties:
  *               firstName:
  *                 type: string
@@ -36,6 +57,8 @@ const {
  *               email:
  *                 type: string
  *               password:
+ *                 type: string
+ *               otpToken:
  *                 type: string
  *               phone:
  *                 type: string

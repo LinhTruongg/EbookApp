@@ -251,7 +251,7 @@ class SimpleApiService {
 
   async register(userData: any) {
     try {
-      console.log('🔵 SimpleApiService.register called with:', userData);
+      console.log('🔵 SimpleApiService.register called with:', { ...userData, password: '***' });
       const response = await this.axiosInstance.post('/auth/register', userData);
       console.log('✅ SimpleApiService.register success:', response.data);
       return response.data;
@@ -286,6 +286,30 @@ class SimpleApiService {
       return response.data;
     } catch (error: any) {
       console.error('❌ SimpleApiService.refreshToken error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async sendRegistrationOTP(email: string) {
+    try {
+      console.log('🔵 SimpleApiService.sendRegistrationOTP called with:', email);
+      const response = await this.axiosInstance.post('/auth/send-registration-otp', { email });
+      console.log('✅ SimpleApiService.sendRegistrationOTP success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.sendRegistrationOTP error:', error.response?.data || error.message);
+      throw error;
+    }
+  }
+
+  async verifyRegistrationOTP(token: string, otpCode: string) {
+    try {
+      console.log('🔵 SimpleApiService.verifyRegistrationOTP called');
+      const response = await this.axiosInstance.post('/auth/verify-registration-otp', { token, otpCode });
+      console.log('✅ SimpleApiService.verifyRegistrationOTP success:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ SimpleApiService.verifyRegistrationOTP error:', error.response?.data || error.message);
       throw error;
     }
   }

@@ -46,9 +46,10 @@ interface UserGrowthData {
 
 interface UserGrowthChartProps {
   onDataLoaded?: (data: UserGrowthData) => void;
+  refreshKey?: number;
 }
 
-const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
+const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded, refreshKey }) => {
   const [data, setData] = useState<UserGrowthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'6months' | '12months' | '24months'>('12months');
@@ -57,14 +58,19 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
     try {
       setLoading(true);
       const response = await apiService.getUserGrowthStats(period);
-      if (response.success) {
+      if (response.success && response.data) {
+        console.log('📈 User growth data loaded:', response.data);
+        if (response.data.monthlyData) {
+          console.log('📈 Monthly data:', response.data.monthlyData);
+        }
         setData(response.data);
         onDataLoaded?.(response.data);
       } else {
+        console.error('❌ User growth API error:', response.message);
         Alert.alert('Lỗi', response.message || 'Không thể tải dữ liệu tăng trưởng người dùng');
       }
     } catch (error) {
-      console.error('Error loading user growth data:', error);
+      console.error('❌ Error loading user growth data:', error);
       Alert.alert('Lỗi', 'Có lỗi xảy ra khi tải dữ liệu tăng trưởng người dùng');
     } finally {
       setLoading(false);
@@ -73,7 +79,7 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
 
   useEffect(() => {
     loadUserGrowthData(selectedPeriod);
-  }, [selectedPeriod]);
+  }, [selectedPeriod, refreshKey]);
 
   const formatMonthLabel = (month: string) => {
     const [year, monthNum] = month.split('-');
@@ -85,18 +91,28 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
   };
 
   const getChartData = () => {
-    if (!data) return null;
+    if (!data || !data.monthlyData || data.monthlyData.length === 0) {
+      console.warn('⚠️ No user growth data available for chart');
+      return null;
+    }
 
     const labels = data.monthlyData.map(item => formatMonthLabel(item.month));
+    const totalUsersValues = data.monthlyData.map(item => item.totalUsers || 0);
+    const newUsersValues = data.monthlyData.map(item => item.newUsers || 0);
+    
+    console.log('📈 Chart labels:', labels);
+    console.log('📈 Chart total users values:', totalUsersValues);
+    console.log('📈 Chart new users values:', newUsersValues);
+
     const datasets = [
       {
-        data: data.monthlyData.map(item => item.totalUsers),
-        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`, // Blue color
+        data: totalUsersValues,
+        color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
         strokeWidth: 3,
       },
       {
-        data: data.monthlyData.map(item => item.newUsers),
-        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`, // Green color
+        data: newUsersValues,
+        color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
         strokeWidth: 2,
       }
     ];
@@ -213,11 +229,13 @@ const UserGrowthChart: React.FC<UserGrowthChartProps> = ({ onDataLoaded }) => {
                   strokeDasharray: '3,3',
                   stroke: '#E5E7EB',
                 },
-                paddingLeft: 16,
-                paddingRight: 16,
-                paddingTop: 16,
-                paddingBottom: 16,
-              }}
+                formatXLabel: (value: string, index: number) => {
+                  return index % 3 === 0 ? value : '';
+                },
+                propsForLabels: {
+                  fontSize: 10,
+                },
+              } as any}
               bezier
               style={styles.chart}
             />

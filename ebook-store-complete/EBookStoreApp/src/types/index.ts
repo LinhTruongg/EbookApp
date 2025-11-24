@@ -44,6 +44,7 @@ export interface RegisterRequest {
   lastName: string;
   email: string;
   password: string;
+  otpToken: string;
   phone?: string;
   dateOfBirth?: string;
   gender?: 'male' | 'female' | 'other';
@@ -259,8 +260,10 @@ export interface AuthContextType {
   refreshToken: () => Promise<void>;
   updateUser: (user: User) => void;
   updateProfile: (userData: Partial<User>) => Promise<void>;
-  forgotPassword: (email: string) => Promise<void>;
-  verifyForgotPassword: (token: string, otpCode: string) => Promise<void>;
+  sendRegistrationOTP: (email: string) => Promise<any>;
+  verifyRegistrationOTP: (token: string, otpCode: string) => Promise<any>;
+  forgotPassword: (email: string) => Promise<any>;
+  verifyForgotPassword: (token: string, otpCode: string) => Promise<any>;
   resetPassword: (token: string, password: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }

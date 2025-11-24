@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Platform,
   Modal,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useAuth } from '../../context/AuthContext';
@@ -16,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { RegisterRequest } from '../../types';
 
 const RegisterForm: React.FC = () => {
-  const [formData, setFormData] = useState<RegisterRequest>({
+  const [formData, setFormData] = useState<Omit<RegisterRequest, 'otpToken'>>({
     firstName: '',
     lastName: '',
     email: '',
@@ -31,8 +32,78 @@ const RegisterForm: React.FC = () => {
   const [showGenderModal, setShowGenderModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const { register, logout, isLoading } = useAuth();
+  const { register, logout, isLoading, sendRegistrationOTP, verifyRegistrationOTP } = useAuth();
   const router = useRouter();
+  
+  const [otpCode, setOtpCode] = useState('');
+  const [otpToken, setOtpToken] = useState<string>('');
+  const [verifyToken, setVerifyToken] = useState<string>('');
+  const [isSendingOTP, setIsSendingOTP] = useState(false);
+  const [isVerifyingOTP, setIsVerifyingOTP] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600);
+  const [isResending, setIsResending] = useState(false);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (otpSent && !otpVerified && timeLeft > 0) {
+      if (!timerRef.current) {
+        timerRef.current = setInterval(() => {
+          setTimeLeft((prev) => {
+            if (prev <= 1) {
+              if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+              }
+              return 0;
+            }
+            return prev - 1;
+          });
+        }, 1000);
+      }
+    } else {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [otpSent, otpVerified, timeLeft]);
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const validateEmail = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email là bắt buộc';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'Email không hợp lệ';
+    }
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateOTP = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
+    if (!otpCode.trim()) {
+      newErrors.otpCode = 'Mã xác thực là bắt buộc';
+    } else if (!/^\d{6}$/.test(otpCode)) {
+      newErrors.otpCode = 'Mã xác thực phải là 6 chữ số';
+    }
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    return Object.keys(newErrors).length === 0;
+  };
 
   const validateForm = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -48,6 +119,9 @@ const RegisterForm: React.FC = () => {
       newErrors.email = 'Email là bắt buộc';
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       newErrors.email = 'Email không hợp lệ';
+    }
+    if (!otpVerified) {
+      newErrors.otpVerified = 'Vui lòng xác thực email trước khi đăng ký';
     }
     if (!formData.password) {
       newErrors.password = 'Mật khẩu là bắt buộc';
@@ -71,26 +145,138 @@ const RegisterForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
+  const handleSendOTP = async () => {
+    if (!validateEmail()) {
+      return;
+    }
+
+    try {
+      setIsSendingOTP(true);
+      const response = await sendRegistrationOTP(formData.email.trim().toLowerCase());
+      
+      if (response?.data?.token) {
+        setOtpToken(response.data.token);
+        setOtpSent(true);
+        setTimeLeft(600);
+      }
+      
+      if (response?.debug) {
+        const { otpCode, emailConfigured, emailError } = response.debug;
+        let message = '';
+        
+        if (emailError) {
+          message = `❌ Lỗi gửi email:\n${emailError.message}\n\n`;
+          message += `🔑 Mã xác thực (dùng để test): ${otpCode}`;
+        } else if (!emailConfigured) {
+          message = `🔑 Mã xác thực: ${otpCode}\n\nEmail service chưa được cấu hình. Mã này chỉ hiển thị trong development mode.`;
+        } else {
+          message = `🔑 Mã xác thực: ${otpCode}`;
+        }
+        
+        Alert.alert(
+          'Mã xác thực (Development)',
+          message,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error: any) {
+      console.error('Send OTP error:', error);
+    } finally {
+      setIsSendingOTP(false);
+    }
+  };
+
+  const handleVerifyOTP = async () => {
+    if (!validateOTP()) {
+      return;
+    }
+
+    if (timeLeft === 0) {
+      Alert.alert('Mã đã hết hạn', 'Vui lòng yêu cầu mã mới');
+      return;
+    }
+
+    if (!otpToken) {
+      Alert.alert('Lỗi', 'Token không hợp lệ. Vui lòng thử lại từ đầu.');
+      return;
+    }
+
+    try {
+      setIsVerifyingOTP(true);
+      const response = await verifyRegistrationOTP(otpToken, otpCode);
+      
+      if (response?.data?.token) {
+        setVerifyToken(response.data.token);
+        setOtpVerified(true);
+        setOtpCode('');
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors.otpCode;
+          return newErrors;
+        });
+      }
+    } catch (error: any) {
+      console.error('Verify OTP error:', error);
+    } finally {
+      setIsVerifyingOTP(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    try {
+      setIsResending(true);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      const response = await sendRegistrationOTP(formData.email.trim().toLowerCase());
+      
+      if (response?.data?.token) {
+        setOtpToken(response.data.token);
+      }
+      
+      setOtpCode('');
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors.otpCode;
+        return newErrors;
+      });
+      setTimeLeft(600);
+      Alert.alert('Thành công', 'Mã xác thực mới đã được gửi đến email của bạn');
+    } catch (error) {
+      console.error('Resend OTP error:', error);
+      Alert.alert('Lỗi', 'Không thể gửi lại mã. Vui lòng thử lại sau');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
   const handleRegister = async () => {
     if (!validateForm()) {
       Alert.alert('Lỗi', 'Vui lòng kiểm tra lại thông tin đã nhập');
       return;
     }
 
+    if (!otpVerified || !verifyToken) {
+      Alert.alert('Lỗi', 'Vui lòng xác thực email trước khi đăng ký');
+      return;
+    }
+
     try {
       // Prepare data for API
-      const registrationData = {
+      const registrationData: RegisterRequest = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
+        otpToken: verifyToken,
         phone: formData.phone.trim() || null,
         dateOfBirth: formData.dateOfBirth || null,
         gender: formData.gender || null,
         address: formData.address.trim() || null,
       };
 
-      console.log('Registration data:', registrationData);
+      console.log('Registration data:', { ...registrationData, password: '***', otpToken: '***' });
       await register(registrationData);
       await logout();
       router.replace('/(auth)/login');
@@ -158,18 +344,109 @@ const RegisterForm: React.FC = () => {
       {/* Email */}
       <View style={styles.fieldContainer}>
         <Text style={styles.label}>Email *</Text>
-        <TextInput
-          style={[styles.input, errors.email && styles.inputError]}
-          placeholder="example@email.com"
-          placeholderTextColor="#9CA3AF"
-          value={formData.email}
-          onChangeText={(value) => updateFormData('email', value)}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
+        <View style={styles.emailRow}>
+          <TextInput
+            style={[styles.input, styles.emailInput, errors.email && styles.inputError]}
+            placeholder="example@email.com"
+            placeholderTextColor="#9CA3AF"
+            value={formData.email}
+            onChangeText={(value) => {
+              updateFormData('email', value);
+              if (otpSent) {
+                setOtpSent(false);
+                setOtpVerified(false);
+                setOtpToken('');
+                setVerifyToken('');
+                setOtpCode('');
+              }
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            editable={!isSendingOTP && !otpVerified}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, (isSendingOTP || !formData.email.trim() || otpVerified) && styles.sendButtonDisabled]}
+            onPress={handleSendOTP}
+            disabled={isSendingOTP || !formData.email.trim() || otpVerified}
+          >
+            {isSendingOTP ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.sendButtonText}>{otpVerified ? '✓' : 'Gửi'}</Text>
+            )}
+          </TouchableOpacity>
+        </View>
         {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
       </View>
+
+      {/* OTP Field */}
+      {otpSent && !otpVerified && (
+        <View style={styles.fieldContainer}>
+          <View style={styles.otpHeader}>
+            <Text style={styles.label}>Mã xác thực (6 số) *</Text>
+            {timeLeft > 0 && (
+              <Text style={styles.timerText}>
+                Còn lại: <Text style={styles.timerValue}>{formatTime(timeLeft)}</Text>
+              </Text>
+            )}
+          </View>
+          <TextInput
+            style={[styles.input, styles.otpInput, errors.otpCode && styles.inputError]}
+            placeholder="000000"
+            placeholderTextColor="#9CA3AF"
+            value={otpCode}
+            onChangeText={(value) => {
+              const numericValue = value.replace(/[^0-9]/g, '').slice(0, 6);
+              setOtpCode(numericValue);
+              if (errors.otpCode) {
+                setErrors(prev => ({ ...prev, otpCode: '' }));
+              }
+            }}
+            keyboardType="number-pad"
+            maxLength={6}
+            editable={!isVerifyingOTP && timeLeft > 0}
+          />
+          {errors.otpCode && <Text style={styles.errorText}>{errors.otpCode}</Text>}
+          <View style={styles.otpActions}>
+            <TouchableOpacity
+              style={[styles.verifyButton, (isVerifyingOTP || timeLeft === 0) && styles.verifyButtonDisabled]}
+              onPress={handleVerifyOTP}
+              disabled={isVerifyingOTP || timeLeft === 0}
+            >
+              {isVerifyingOTP ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.verifyButtonText}>Xác thực</Text>
+              )}
+            </TouchableOpacity>
+            {timeLeft === 0 && (
+              <TouchableOpacity
+                style={styles.resendButton}
+                onPress={handleResendOTP}
+                disabled={isResending}
+              >
+                {isResending ? (
+                  <ActivityIndicator color="#667eea" size="small" />
+                ) : (
+                  <Text style={styles.resendButtonText}>Gửi lại mã</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+          {otpVerified && (
+            <View style={styles.verifiedBadge}>
+              <Text style={styles.verifiedText}>✓ Email đã được xác thực</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {otpVerified && (
+        <View style={styles.verifiedBadge}>
+          <Text style={styles.verifiedText}>✓ Email đã được xác thực</Text>
+        </View>
+      )}
 
       {/* Password Fields */}
       <View style={styles.fieldContainer}>
@@ -643,6 +920,103 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: 'white',
+    fontWeight: '600',
+  },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  emailInput: {
+    flex: 1,
+  },
+  sendButton: {
+    height: 44,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 70,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  sendButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  otpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  timerText: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  timerValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#EF4444',
+  },
+  otpInput: {
+    textAlign: 'center',
+    fontSize: 20,
+    letterSpacing: 8,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  otpActions: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  verifyButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  verifyButtonDisabled: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.6,
+  },
+  verifyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resendButton: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  resendButtonText: {
+    color: '#667eea',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  verifiedBadge: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#D1FAE5',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  verifiedText: {
+    color: '#065F46',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

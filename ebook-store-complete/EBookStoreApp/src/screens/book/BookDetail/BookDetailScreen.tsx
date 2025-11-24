@@ -279,7 +279,20 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
         }
       }
     } catch (e: any) {
-      // Silently handle error - rating change may have failed
+      const errorMessage = e.response?.data?.message || e.message || 'Không thể đánh giá sách';
+      if (errorMessage.includes('50%')) {
+        Alert.alert(
+          'Chưa đủ điều kiện',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Lỗi',
+          errorMessage,
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setRatingLoading(false);
     }
@@ -422,13 +435,6 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
               )}
             </View>
 
-            {/* Like Button */}
-            <TouchableOpacity style={styles.likeBookButton} onPress={handleLike} accessibilityLabel="Thích sách">
-              <Text style={[styles.likeBookText, isLiked && styles.likedBook]}>
-                {isLiked ? '❤️' : '🤍'} {likeCount}
-              </Text>
-            </TouchableOpacity>
-
             {/* Category */}
             {book.categories && book.categories.length > 0 && (
               <View style={styles.categoryContainer}>
@@ -511,11 +517,6 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
                   interactive={true}
                   showText={false}
                 />
-                {userRating && (
-                  <Text style={styles.ratingStatusText}>
-                    Cảm ơn bạn đã đánh giá {userRating.rating} sao!
-                  </Text>
-                )}
               </View>
             )}
           </View>

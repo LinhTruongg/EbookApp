@@ -26,6 +26,10 @@ const registerValidation = [
     .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
     .withMessage('Mật khẩu phải chứa ít nhất 1 chữ thường, 1 chữ hoa và 1 số'),
   
+  body('otpToken')
+    .notEmpty()
+    .withMessage('Token xác thực OTP là bắt buộc'),
+  
   body('phone')
     .optional()
     .custom((value) => {
@@ -110,11 +114,34 @@ const changePasswordValidation = [
     .withMessage('Mật khẩu mới phải chứa ít nhất 1 chữ thường, 1 chữ hoa và 1 số')
 ];
 
+const sendRegistrationOTPValidation = [
+  body('email')
+    .isEmail()
+    .withMessage('Email không hợp lệ')
+    .normalizeEmail()
+];
+
+const verifyRegistrationOTPValidation = [
+  body('token')
+    .notEmpty()
+    .withMessage('Token không được để trống'),
+  
+  body('otpCode')
+    .notEmpty()
+    .withMessage('Mã OTP không được để trống')
+    .isLength({ min: 6, max: 6 })
+    .withMessage('Mã OTP phải có đúng 6 chữ số')
+    .matches(/^\d{6}$/)
+    .withMessage('Mã OTP phải là 6 chữ số')
+];
+
 module.exports = {
   registerValidation,
   loginValidation,
   forgotPasswordValidation,
   verifyForgotPasswordValidation,
   resetPasswordValidation,
-  changePasswordValidation
+  changePasswordValidation,
+  sendRegistrationOTPValidation,
+  verifyRegistrationOTPValidation
 };

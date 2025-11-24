@@ -405,6 +405,54 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     dispatch({ type: 'UPDATE_USER', payload: user });
   };
 
+  const sendRegistrationOTP = async (email: string): Promise<any> => {
+    try {
+      const response = await simpleApiService.sendRegistrationOTP(email);
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'OTP Sent',
+          text2: response.message,
+        });
+        return response;
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to send OTP';
+      Toast.show({
+        type: 'error',
+        text1: 'Send OTP Failed',
+        text2: errorMessage,
+      });
+      throw error;
+    }
+  };
+
+  const verifyRegistrationOTP = async (token: string, otpCode: string): Promise<any> => {
+    try {
+      const response = await simpleApiService.verifyRegistrationOTP(token, otpCode);
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'OTP Verified',
+          text2: response.message,
+        });
+        return response;
+      } else {
+        throw new Error(response.message);
+      }
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || error.message || 'OTP verification failed';
+      Toast.show({
+        type: 'error',
+        text1: 'OTP Verification Failed',
+        text2: errorMessage,
+      });
+      throw error;
+    }
+  };
+
   const forgotPassword = async (email: string): Promise<any> => {
     try {
       const response = await simpleApiService.forgotPassword(email);
@@ -541,6 +589,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     refreshToken,
     updateUser,
     updateProfile,
+    sendRegistrationOTP,
+    verifyRegistrationOTP,
     forgotPassword,
     verifyForgotPassword,
     resetPassword,

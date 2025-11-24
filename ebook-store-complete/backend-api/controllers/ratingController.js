@@ -1,4 +1,4 @@
-const { Rating, User, Book } = require('../models');
+const { Rating, User, Book, UserLibrary } = require('../models');
 const { validationResult } = require('express-validator');
 
 // Helper function to update book's average rating
@@ -56,6 +56,18 @@ class RatingController {
         return res.status(404).json({
           success: false,
           message: 'Không tìm thấy sách'
+        });
+      }
+
+      // Check reading progress - user must have read at least 50% to rate
+      const libraryEntry = await UserLibrary.findOne({
+        where: { userId, bookId }
+      });
+
+      if (!libraryEntry || libraryEntry.readingProgress < 50) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bạn cần đọc ít nhất 50% sách để có thể đánh giá'
         });
       }
 

@@ -925,6 +925,7 @@ class ApiService {
       totalComments: number;
       totalReviews: number;
       totalReadingSessions: number;
+      totalAuthors: number;
     };
     growth: {
       newBooksLast30Days: number;

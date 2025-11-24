@@ -44,9 +44,10 @@ interface RevenueData {
 
 interface RevenueChartProps {
   onDataLoaded?: (data: RevenueData) => void;
+  refreshKey?: number;
 }
 
-const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded }) => {
+const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded, refreshKey }) => {
   const [data, setData] = useState<RevenueData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState<'6months' | '12months' | '24months'>('12months');
@@ -56,13 +57,18 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded }) => {
       setLoading(true);
       const response = await apiService.getRevenueStats(period);
       if (response.success) {
+        console.log('📊 Revenue data loaded:', response.data);
+        if (response.data && response.data.monthlyData) {
+          console.log('📊 Monthly data:', response.data.monthlyData);
+        }
         setData(response.data || null);
         onDataLoaded?.(response.data);
       } else {
+        console.error('❌ Revenue API error:', response.message);
         Alert.alert('Lỗi', response.message || 'Không thể tải dữ liệu doanh thu');
       }
     } catch (error) {
-      console.error('Error loading revenue data:', error);
+      console.error('❌ Error loading revenue data:', error);
       Alert.alert('Lỗi', 'Có lỗi xảy ra khi tải dữ liệu doanh thu');
     } finally {
       setLoading(false);
@@ -71,7 +77,7 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded }) => {
 
   useEffect(() => {
     loadRevenueData(selectedPeriod);
-  }, [selectedPeriod]);
+  }, [selectedPeriod, refreshKey]);
 
   const formatMonthLabel = (month: string) => {
     const [year, monthNum] = month.split('-');
@@ -92,12 +98,20 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded }) => {
   };
 
   const getChartData = () => {
-    if (!data) return null;
+    if (!data || !data.monthlyData || data.monthlyData.length === 0) {
+      console.warn('⚠️ No revenue data available for chart');
+      return null;
+    }
 
     const labels = data.monthlyData.map(item => formatMonthLabel(item.month));
+    const revenueValues = data.monthlyData.map(item => item.revenue || 0);
+    
+    console.log('📊 Chart labels:', labels);
+    console.log('📊 Chart revenue values:', revenueValues);
+
     const datasets = [
       {
-        data: data.monthlyData.map(item => item.revenue),
+        data: revenueValues,
         color: (opacity = 1) => `rgba(16, 185, 129, ${opacity})`,
         strokeWidth: 3,
       }
@@ -213,11 +227,13 @@ const RevenueChart: React.FC<RevenueChartProps> = ({ onDataLoaded }) => {
                   stroke: '#E5E7EB',
                 },
                 formatYLabel: (value) => formatRevenue(parseFloat(value)),
-                paddingLeft: 16,
-                paddingRight: 16,
-                paddingTop: 16,
-                paddingBottom: 16,
-              }}
+                formatXLabel: (value: string, index: number) => {
+                  return index % 3 === 0 ? value : '';
+                },
+                propsForLabels: {
+                  fontSize: 10,
+                },
+              } as any}
               bezier
               style={styles.chart}
             />

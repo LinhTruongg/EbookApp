@@ -14,6 +14,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { apiService } from '../../../services/api';
 import UserGrowthChart from '../../../components/admin/UserGrowthChart';
 import RevenueChart from '../../../components/admin/RevenueChart';
+import ExportExcel from '../../../components/admin/ExportExcel';
 
 interface AdminDashboardScreenProps {
   navigation?: any;
@@ -26,6 +27,9 @@ const DashboardContent = ({ user }: { user: any }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activities, setActivities] = useState<any[]>([]);
+  const [revenueData, setRevenueData] = useState<any>(null);
+  const [userGrowthData, setUserGrowthData] = useState<any>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const loadDashboardStats = async () => {
     try {
@@ -65,6 +69,7 @@ const DashboardContent = ({ user }: { user: any }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setRefreshKey(prev => prev + 1);
     await Promise.all([loadDashboardStats(), loadRecentActivities()]);
     setRefreshing(false);
   };
@@ -117,10 +122,10 @@ const DashboardContent = ({ user }: { user: any }) => {
       color: '#F59E0B' 
     },
     { 
-      title: 'Phiên đọc', 
-      value: stats.overview.totalReadingSessions.toLocaleString(), 
+      title: 'Tác giả', 
+      value: stats.overview.totalAuthors.toLocaleString(), 
       trend: '', 
-      icon: '📖', 
+      icon: '✍️', 
       color: '#8B5CF6' 
     },
   ];
@@ -225,13 +230,43 @@ const DashboardContent = ({ user }: { user: any }) => {
         </View>
       </View>
 
+      {/* Export Buttons */}
+      <View style={styles.exportSection}>
+        <View style={styles.exportButtonsRow}>
+          <ExportExcel
+            revenueData={revenueData}
+            userGrowthData={null}
+            dashboardStats={null}
+            fileName="Dashboard_Report"
+            exportType="revenue"
+            buttonText="📊 Xuất Doanh Thu"
+          />
+          <ExportExcel
+            revenueData={null}
+            userGrowthData={userGrowthData}
+            dashboardStats={null}
+            fileName="Dashboard_Report"
+            exportType="userGrowth"
+            buttonText="📈 Xuất Tăng Trưởng"
+          />
+          <ExportExcel
+            revenueData={revenueData}
+            userGrowthData={userGrowthData}
+            dashboardStats={stats}
+            fileName="Dashboard_Report"
+            exportType="all"
+            buttonText="📋 Xuất Tất Cả"
+          />
+        </View>
+      </View>
+
       {/* Charts Section - Side by Side */}
       <View style={styles.chartsRow}>
         <View style={styles.chartWrapper}>
-          <UserGrowthChart />
+          <UserGrowthChart onDataLoaded={setUserGrowthData} refreshKey={refreshKey} />
         </View>
         <View style={styles.chartWrapper}>
-          <RevenueChart />
+          <RevenueChart onDataLoaded={setRevenueData} refreshKey={refreshKey} />
         </View>
       </View>
 
@@ -373,6 +408,15 @@ const styles = StyleSheet.create({
   trendText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  exportSection: {
+    marginBottom: 16,
+  },
+  exportButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
   },
   chartsRow: {
     flexDirection: width > 768 ? 'row' : 'column',

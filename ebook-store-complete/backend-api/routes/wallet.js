@@ -146,7 +146,7 @@ router.post('/purchase-book', authenticateToken, asyncHandler(async (req, res) =
 
   await UserLibrary.findOrCreate({
     where: { userId: user.id, bookId: book.id },
-    defaults: { userId: user.id, bookId: book.id, progress: 0, status: 'purchased' }
+    defaults: { userId: user.id, bookId: book.id, readingProgress: 0, currentPage: 1, accessType: 'free' }
   });
 
   // Note: book remains priced/locked globally; access is enforced per-user via library
