@@ -1,6 +1,7 @@
 const { Comment, User, Book, CommentLike } = require('../models');
 const { Op } = require('sequelize');
 const ActivityLogger = require('../utils/activityLogger');
+const { containsSensitiveWords } = require('../utils/contentFilter');
 
 // Get all comments for a book
 const getBookComments = async (req, res) => {
@@ -172,13 +173,17 @@ const createComment = async (req, res) => {
       }
     }
 
+    // Check for sensitive words
+    const trimmedContent = content.trim();
+    const hasSensitiveWords = containsSensitiveWords(trimmedContent);
+
     // Create comment
     const comment = await Comment.create({
       userId,
       bookId: parseInt(bookId),
-      content: content.trim(),
+      content: trimmedContent,
       parentId: parentId ? parseInt(parentId) : null,
-      isApproved: true,
+      isApproved: !hasSensitiveWords,
       likesCount: 0
     });
 
@@ -211,7 +216,10 @@ const createComment = async (req, res) => {
     res.status(201).json({
       success: true,
       data: formattedComment,
-      message: 'Thêm bình luận thành công'
+      message: hasSensitiveWords 
+        ? 'Bình luận của bạn có từ nhạy cảm và vui lòng chờ duyệt' 
+        : 'Thêm bình luận thành công',
+      isPending: hasSensitiveWords
     });
   } catch (error) {
     console.error('Error creating comment:', error);
@@ -262,14 +270,22 @@ const updateComment = async (req, res) => {
       });
     }
 
+    // Check for sensitive words
+    const trimmedContent = content.trim();
+    const hasSensitiveWords = containsSensitiveWords(trimmedContent);
+
     // Update comment
     await comment.update({
-      content: content.trim()
+      content: trimmedContent,
+      isApproved: !hasSensitiveWords
     });
 
     res.json({
       success: true,
-      message: 'Cập nhật bình luận thành công'
+      message: hasSensitiveWords 
+        ? 'Bình luận đã được cập nhật và đang chờ duyệt' 
+        : 'Cập nhật bình luận thành công',
+      isPending: hasSensitiveWords
     });
   } catch (error) {
     console.error('Error updating comment:', error);

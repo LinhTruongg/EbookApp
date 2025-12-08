@@ -263,25 +263,37 @@ const RegisterForm: React.FC = () => {
     }
 
     try {
-      // Prepare data for API
       const registrationData: RegisterRequest = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
         email: formData.email.trim().toLowerCase(),
         password: formData.password,
         otpToken: verifyToken,
-        phone: formData.phone.trim() || null,
-        dateOfBirth: formData.dateOfBirth || null,
-        gender: formData.gender || null,
-        address: formData.address.trim() || null,
+        ...(formData.phone?.trim() ? { phone: formData.phone.trim() } : {}),
+        ...(formData.dateOfBirth ? { dateOfBirth: formData.dateOfBirth } : {}),
+        ...(formData.gender ? { gender: formData.gender } : {}),
+        ...(formData.address?.trim() ? { address: formData.address.trim() } : {}),
       };
 
       console.log('Registration data:', { ...registrationData, password: '***', otpToken: '***' });
       await register(registrationData);
       await logout();
       router.replace('/(auth)/login');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Registration error:', error);
+      let errorMessage = 'Đăng ký thất bại. Vui lòng thử lại.';
+      
+      if (error?.response?.data?.errors) {
+        const validationErrors = error.response.data.errors;
+        const errorMessages = validationErrors.map((err: any) => err.msg || err.message).join('\n');
+        errorMessage = `Lỗi xác thực:\n${errorMessages}`;
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Lỗi đăng ký', errorMessage);
     }
   };
 
@@ -485,7 +497,7 @@ const RegisterForm: React.FC = () => {
       </View>
 
       {/* Optional Fields */}
-      <Text style={styles.sectionTitle}>Thông tin bổ sung</Text>
+      <Text style={styles.sectionTitle}>Thông tin bổ sung (tùy chọn)</Text>
 
       {/* Phone and Gender Row */}
       <View style={styles.rowContainer}>
@@ -561,6 +573,16 @@ const RegisterForm: React.FC = () => {
             </TouchableOpacity>
             
             <TouchableOpacity
+              style={styles.modalOption}
+              onPress={() => {
+                setFormData(prev => ({ ...prev, gender: undefined }));
+                setShowGenderModal(false);
+              }}
+            >
+              <Text style={styles.modalOptionText}>Xóa lựa chọn</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
               style={styles.modalCancel}
               onPress={() => setShowGenderModal(false)}
             >
@@ -576,7 +598,6 @@ const RegisterForm: React.FC = () => {
         <TouchableOpacity
           style={styles.dateInput}
           onPress={() => {
-            console.log('Date input pressed, showing picker');
             if (formData.dateOfBirth) {
               try {
                 setSelectedDate(new Date(formData.dateOfBirth));
@@ -594,6 +615,14 @@ const RegisterForm: React.FC = () => {
           </Text>
           <Text style={styles.calendarIcon}>📅</Text>
         </TouchableOpacity>
+        {formData.dateOfBirth && (
+          <TouchableOpacity
+            style={styles.clearButton}
+            onPress={() => setFormData(prev => ({ ...prev, dateOfBirth: '' }))}
+          >
+            <Text style={styles.clearButtonText}>Xóa</Text>
+          </TouchableOpacity>
+        )}
         {showDatePicker && Platform.OS === 'ios' && (
           <Modal
             transparent={true}
@@ -1018,6 +1047,15 @@ const styles = StyleSheet.create({
     color: '#065F46',
     fontSize: 14,
     fontWeight: '600',
+  },
+  clearButton: {
+    marginTop: 4,
+    alignSelf: 'flex-end',
+  },
+  clearButtonText: {
+    color: '#EF4444',
+    fontSize: 12,
+    fontWeight: '500',
   },
 });
 

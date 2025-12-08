@@ -31,10 +31,9 @@ const registerValidation = [
     .withMessage('Token xác thực OTP là bắt buộc'),
   
   body('phone')
-    .optional()
+    .optional({ checkFalsy: true })
     .custom((value) => {
-      if (!value) return true; // Allow empty/null
-      // Vietnamese phone number validation: 10-11 digits starting with 0
+      if (!value || value.trim() === '') return true;
       const phoneRegex = /^0[0-9]{9,10}$/;
       if (!phoneRegex.test(value)) {
         throw new Error('Số điện thoại phải có 10-11 chữ số và bắt đầu bằng 0');
@@ -43,23 +42,37 @@ const registerValidation = [
     }),
   
   body('gender')
-    .optional()
+    .optional({ checkFalsy: true })
     .isIn(['male', 'female', 'other'])
     .withMessage('Giới tính không hợp lệ'),
   
   body('dateOfBirth')
-    .optional()
-    .isISO8601()
-    .withMessage('Ngày sinh không hợp lệ'),
+    .optional({ checkFalsy: true })
+    .custom((value) => {
+      if (!value || value.trim() === '') return true;
+      const iso8601Regex = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?)?$/;
+      if (!iso8601Regex.test(value)) {
+        throw new Error('Ngày sinh không hợp lệ. Vui lòng sử dụng định dạng YYYY-MM-DD');
+      }
+      return true;
+    }),
   
   body('address')
-    .optional()
-    .isLength({ max: 255 })
-    .withMessage('Địa chỉ không được quá 255 ký tự')
+    .optional({ checkFalsy: true })
+    .custom((value) => {
+      if (!value || value.trim() === '') return true;
+      if (value.length > 255) {
+        throw new Error('Địa chỉ không được quá 255 ký tự');
+      }
+      return true;
+    })
 ];
 
 const loginValidation = [
   body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Tài khoản không được bỏ trống')
     .isEmail()
     .withMessage('Email không hợp lệ')
     .normalizeEmail(),

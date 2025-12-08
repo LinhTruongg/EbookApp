@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, A
 import { apiService } from '../../../services/api';
 import { Author } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import DateTimeField from '../../../components/common/DateTimeField';
 
 const ManageAuthorsScreen: React.FC = () => {
   const [authors, setAuthors] = useState<Author[]>([]);
@@ -23,7 +24,6 @@ const ManageAuthorsScreen: React.FC = () => {
     avatar: '',
     birthDate: '',
     nationality: '',
-    website: '',
     isActive: true,
   });
 
@@ -46,7 +46,7 @@ const ManageAuthorsScreen: React.FC = () => {
   }, [authors, search]);
 
   const resetForm = () => {
-    setForm({ name: '', bio: '', avatar: '', birthDate: '', nationality: '', website: '', isActive: true });
+    setForm({ name: '', bio: '', avatar: '', birthDate: '', nationality: '', isActive: true });
     setEditing(null);
     setValidationErrors({});
   };
@@ -56,15 +56,35 @@ const ManageAuthorsScreen: React.FC = () => {
     setModalVisible(true);
   };
 
+  const formatDateToISO = (dateStr: string): string => {
+    if (!dateStr) return '';
+    if (dateStr.includes('T')) return dateStr;
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toISOString();
+  };
+
+  const formatDateToYYYYMMDD = (isoString: string): string => {
+    if (!isoString) return '';
+    try {
+      const date = new Date(isoString);
+      if (isNaN(date.getTime())) return '';
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      return '';
+    }
+  };
+
   const openEdit = (author: Author) => {
     setEditing(author);
     setForm({
       name: author.name || '',
       bio: (author as any).bio || author.biography || '',
       avatar: author.avatar || '',
-      birthDate: author.birthDate || '',
+      birthDate: author.birthDate ? formatDateToISO(author.birthDate) : '',
       nationality: author.nationality || '',
-      website: author.website || '',
       isActive: author.isActive,
     });
     setModalVisible(true);
@@ -128,23 +148,21 @@ const ManageAuthorsScreen: React.FC = () => {
     if (!form.name.trim()) {
       errors.name = 'Tên tác giả là bắt buộc';
     }
-    if (form.birthDate && form.birthDate.trim()) {
-      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-      if (!dateRegex.test(form.birthDate.trim())) {
-        errors.birthDate = 'Ngày sinh phải có định dạng YYYY-MM-DD';
-      }
-    }
     setValidationErrors(errors);
     if (Object.keys(errors).length > 0) {
       Alert.alert('⚠️ Thông tin không hợp lệ', Object.values(errors).join('\n'));
       return;
     }
     try {
+      const submitData = {
+        ...form,
+        birthDate: form.birthDate ? formatDateToYYYYMMDD(form.birthDate) : undefined,
+      };
       if (editing) {
-        const res = await apiService.updateAuthor(String(editing.id), form as any);
+        const res = await apiService.updateAuthor(String(editing.id), submitData as any);
         if (!res.success) return Alert.alert('Lỗi', res.message || 'Cập nhật thất bại');
       } else {
-        const res = await apiService.createAuthor(form as any);
+        const res = await apiService.createAuthor(submitData as any);
         if (!res.success) return Alert.alert('Lỗi', res.message || 'Tạo thất bại');
       }
       setModalVisible(false);
@@ -278,23 +296,20 @@ const ManageAuthorsScreen: React.FC = () => {
                 <TextInput style={styles.input} value={form.nationality} onChangeText={(v) => setForm({ ...form, nationality: v })} placeholder="VD: Việt Nam" />
               </View>
               <View style={[styles.formGroup, styles.col]}>
-                <Text style={styles.label}>Ngày sinh</Text>
-                <TextInput
-                  style={[styles.input, validationErrors.birthDate && styles.inputError]}
+                <DateTimeField
+                  label="Ngày sinh"
                   value={form.birthDate}
-                  onChangeText={(v) => {
-                    setForm({ ...form, birthDate: v });
+                  onChange={(isoString) => {
+                    setForm({ ...form, birthDate: isoString });
                     if (validationErrors.birthDate) setValidationErrors({ ...validationErrors, birthDate: '' });
                   }}
-                  placeholder="YYYY-MM-DD"
+                  mode="date"
+                  maximumDate={new Date()}
+                  minimumDate={new Date(1900, 0, 1)}
+                  placeholder="Chọn ngày sinh"
                 />
                 {validationErrors.birthDate ? <Text style={styles.errorText}>{validationErrors.birthDate}</Text> : null}
               </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Website</Text>
-              <TextInput style={styles.input} value={form.website} onChangeText={(v) => setForm({ ...form, website: v })} placeholder="https://..." />
             </View>
 
             <View style={styles.switchRow}>

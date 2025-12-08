@@ -1,0 +1,52 @@
+@startuml Delete Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Xóa Sách (Admin)
+
+actor "Admin" as Admin
+participant "Manage Books Screen" as ManageScreen
+participant "Backend API\n(BookController)" as Backend
+participant "Database\n(MySQL)" as Database
+
+Admin -> ManageScreen: Chọn sách cần xóa
+Admin -> ManageScreen: Nhấn nút "Xóa"
+
+ManageScreen -> Admin: Hiển thị dialog xác nhận\n"Bạn có chắc muốn xóa sách này?"
+
+alt [Hủy]
+    Admin -> ManageScreen: Nhấn "Hủy"
+    ManageScreen -> Admin: Đóng dialog, không xóa
+else [Xác nhận]
+    Admin -> ManageScreen: Nhấn "Xác nhận"
+    
+    ManageScreen -> Backend: Xóa sách\nDELETE /api/books/admin/{id}
+    
+    Backend -> Database: Tìm book theo ID
+    Database -> Backend: Trả về book
+    
+    alt [Book không tồn tại]
+        Backend -> ManageScreen: Trả về lỗi\n{success: false, message: "Không tìm thấy sách"}
+        ManageScreen -> Admin: Hiển thị thông báo lỗi
+    else [Book tồn tại]
+        Backend -> Database: Lấy category để cập nhật count
+        Database -> Backend: Trả về category
+        
+        Backend -> Database: Xóa book\nDELETE FROM books WHERE id = ?
+        Database -> Backend: Xóa thành công
+        
+        Backend -> Database: Cập nhật category.bookCount\n(Giảm số lượng sách)
+        Database -> Backend: Cập nhật thành công
+        
+        Backend -> Database: Log admin activity\n(action: 'delete', bookId, bookTitle)
+        Database -> Backend: Log thành công
+        
+        Backend -> ManageScreen: Trả về thành công\n{success: true, message: "Xóa sách thành công"}
+        ManageScreen -> Admin: Hiển thị "Xóa sách thành công"
+        ManageScreen -> ManageScreen: Reload danh sách sách
+    end
+end
+
+@enduml
+

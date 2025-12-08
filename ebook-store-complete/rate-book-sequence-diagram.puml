@@ -1,0 +1,53 @@
+@startuml Rate Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Chức năng Đánh Giá Sách
+
+actor "Người dùng" as User
+participant "Book Detail Screen" as DetailScreen
+participant "Backend API\n(RatingController)" as Backend
+participant "Database\n(MySQL)" as Database
+
+User -> DetailScreen: Chọn số sao đánh giá\n(1-5 sao)
+
+DetailScreen -> Backend: Tạo/cập nhật đánh giá\nPOST /api/ratings\n{bookId, rating}
+
+Backend -> Database: Kiểm tra sách tồn tại
+Database -> Backend: Trả về book
+
+Backend -> Database: Kiểm tra tiến độ đọc\nUserLibrary.readingProgress
+Database -> Backend: Trả về readingProgress
+
+alt [readingProgress < 50%]
+    Backend -> DetailScreen: Trả về lỗi\n"Bạn cần đọc ít nhất 50% sách"
+    DetailScreen -> User: Hiển thị thông báo lỗi
+else [readingProgress >= 50%]
+    Backend -> Database: Tìm rating đã tồn tại\nRating.findOne({userId, bookId})
+    Database -> Backend: Trả về rating (nếu có)
+    
+    alt [Rating đã tồn tại]
+        Backend -> Database: Cập nhật rating\nUPDATE ratings SET rating = ?
+    else [Rating chưa tồn tại]
+        Backend -> Database: Tạo rating mới\nINSERT INTO ratings
+    end
+    
+    Database -> Backend: Lưu thành công
+    
+    Backend -> Database: Tính toán rating trung bình\nAVG(rating) của tất cả ratings
+    Backend -> Database: Cập nhật Book.rating\nBook.reviewCount
+    Database -> Backend: Cập nhật thành công
+    
+    Backend -> DetailScreen: Trả về thành công\n{rating, user, book}
+    
+    DetailScreen -> Backend: Lấy rating stats\nGET /api/ratings/book/{bookId}/stats
+    Backend -> Database: Tính toán stats\n(averageRating, totalRatings, distribution)
+    Database -> Backend: Trả về stats
+    Backend -> DetailScreen: Trả về rating stats
+    
+    DetailScreen -> User: Cập nhật hiển thị rating\nHiển thị số sao và stats
+end
+
+@enduml
+

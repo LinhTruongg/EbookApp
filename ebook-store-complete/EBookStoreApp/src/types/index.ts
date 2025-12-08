@@ -104,6 +104,7 @@ export interface ApiResponse<T = any> {
   data?: T;
   errors?: any[];
   error?: string;
+  isPending?: boolean;
 }
 
 export interface BookDetailResponse {

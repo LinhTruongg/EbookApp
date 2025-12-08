@@ -1,0 +1,56 @@
+@startuml Create Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Tạo Sách Mới (Admin)
+
+actor "Admin" as Admin
+participant "Manage Books Screen" as ManageScreen
+participant "Backend API\n(BookController)" as Backend
+participant "Cloudinary\n(File Storage)" as Cloudinary
+participant "Database\n(MySQL)" as Database
+
+Admin -> ManageScreen: Nhấn "Thêm sách mới"
+Admin -> ManageScreen: Điền thông tin\n(title, description, category, authors, ...)
+Admin -> ManageScreen: Upload cover image\nUpload file PDF
+Admin -> ManageScreen: Nhấn "Lưu"
+
+ManageScreen -> ManageScreen: Validate form data
+
+ManageScreen -> Backend: Tạo sách mới\nPOST /api/books/admin\nFormData {title, description, file, coverImage, ...}
+
+Backend -> Database: Kiểm tra category tồn tại
+Database -> Backend: Trả về category
+
+alt [Category không tồn tại]
+    Backend -> ManageScreen: Trả về lỗi\n{success: false, message: "Category không tồn tại"}
+    ManageScreen -> Admin: Hiển thị thông báo lỗi
+else [Category tồn tại]
+    Backend -> Cloudinary: Upload cover image
+    Cloudinary -> Backend: Trả về coverImage URL
+    
+    Backend -> Cloudinary: Upload PDF file
+    Cloudinary -> Backend: Trả về fileUrl
+    
+    Backend -> Database: Tạo Book record\nINSERT INTO books
+    Database -> Backend: Trả về book
+    
+    alt [Có authors]
+        Backend -> Database: Liên kết authors\nINSERT INTO book_authors
+        Database -> Backend: Liên kết thành công
+    end
+    
+    Backend -> Database: Cập nhật category.bookCount
+    Database -> Backend: Cập nhật thành công
+    
+    Backend -> Database: Log admin activity
+    Database -> Backend: Log thành công
+    
+    Backend -> ManageScreen: Trả về thành công\n{book}
+    ManageScreen -> Admin: Hiển thị "Tạo sách thành công"
+    ManageScreen -> ManageScreen: Reload danh sách sách
+end
+
+@enduml
+

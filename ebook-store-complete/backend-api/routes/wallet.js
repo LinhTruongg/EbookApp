@@ -3,6 +3,7 @@ const asyncHandler = require('express-async-handler');
 const { Op } = require('sequelize');
 const { authenticateToken } = require('../middleware/auth');
 const { User, Book, UserLibrary, WalletTransaction } = require('../models');
+const authController = require('../controllers/authController');
 
 const router = express.Router();
 
@@ -132,8 +133,9 @@ router.post('/purchase-book', authenticateToken, asyncHandler(async (req, res) =
     user.points -= serverCost;
   await user.save();
 
+    let transactionTime = new Date();
     try {
-      await WalletTransaction.create({
+      const transaction = await WalletTransaction.create({
         userId: user.id,
         type: 'purchase',
         points: -serverCost,
@@ -141,7 +143,19 @@ router.post('/purchase-book', authenticateToken, asyncHandler(async (req, res) =
         bookId: book.id,
         description: `Mở khóa sách: ${book.title}`,
       });
+      transactionTime = transaction.createdAt;
     } catch (e) {}
+
+    try {
+      await authController.sendPurchaseConfirmationEmail(
+        user.email,
+        book.title,
+        serverCost,
+        transactionTime
+      );
+    } catch (emailError) {
+      console.error('❌ Failed to send purchase confirmation email:', emailError);
+    }
   }
 
   await UserLibrary.findOrCreate({

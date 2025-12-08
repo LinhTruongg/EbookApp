@@ -16,7 +16,30 @@ export class ErrorBoundary extends Component<Props, State> {
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): State | null {
+    const errorAny = error as any;
+    
+    if (error.message?.includes('Failed to download remote update') || 
+        error.message?.includes('expo-updates') ||
+        error.message?.includes('Updates')) {
+      return null;
+    }
+
+    if (errorAny?.response || errorAny?.status || errorAny?.config) {
+      return null;
+    }
+
+    if (error.message?.includes('Email hoặc mật khẩu') || 
+        error.message?.includes('Login failed') ||
+        error.message?.includes('Invalid email or password') ||
+        error.message?.includes('authentication') ||
+        error.message?.includes('401') ||
+        error.message?.includes('403') ||
+        error.message?.includes('404') ||
+        error.message?.includes('500')) {
+      return null;
+    }
+
     return { hasError: true, error };
   }
 
@@ -30,6 +53,26 @@ export class ErrorBoundary extends Component<Props, State> {
       this.setState({ hasError: false, error: null });
       return;
     }
+
+    const errorAny = error as any;
+    if (errorAny?.response || errorAny?.status || errorAny?.config) {
+      console.warn('⚠️ API/Network error detected in ErrorBoundary, ignoring...');
+      this.setState({ hasError: false, error: null });
+      return;
+    }
+
+    if (error.message?.includes('Email hoặc mật khẩu') || 
+        error.message?.includes('Login failed') ||
+        error.message?.includes('Invalid email or password') ||
+        error.message?.includes('authentication') ||
+        error.message?.includes('401') ||
+        error.message?.includes('403') ||
+        error.message?.includes('404') ||
+        error.message?.includes('500')) {
+      console.warn('⚠️ Authentication/API error detected, ignoring...');
+      this.setState({ hasError: false, error: null });
+      return;
+    }
   }
 
   handleReset = () => {
@@ -39,11 +82,29 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError && this.state.error) {
       const errorMessage = this.state.error.message || 'Unknown error';
+      const errorAny = this.state.error as any;
       
       if (errorMessage.includes('Failed to download remote update') || 
           errorMessage.includes('expo-updates') ||
           errorMessage.includes('Updates')) {
         console.warn('⚠️ Ignoring updates error, continuing app...');
+        return this.props.children;
+      }
+
+      if (errorAny?.response || errorAny?.status || errorAny?.config) {
+        console.warn('⚠️ Ignoring API/Network error, continuing app...');
+        return this.props.children;
+      }
+
+      if (errorMessage.includes('Email hoặc mật khẩu') || 
+          errorMessage.includes('Login failed') ||
+          errorMessage.includes('Invalid email or password') ||
+          errorMessage.includes('authentication') ||
+          errorMessage.includes('401') ||
+          errorMessage.includes('403') ||
+          errorMessage.includes('404') ||
+          errorMessage.includes('500')) {
+        console.warn('⚠️ Ignoring authentication/API error, continuing app...');
         return this.props.children;
       }
 

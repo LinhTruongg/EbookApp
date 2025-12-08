@@ -1,0 +1,63 @@
+@startuml Deposit Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Chức năng Nạp Tiền
+
+actor "Người dùng" as User
+participant "Deposit Screen" as DepositScreen
+participant "Backend API\n(Wallet)" as Backend
+participant "Stripe Payment" as Stripe
+participant "Database\n(MySQL)" as Database
+
+User -> DepositScreen: Mở màn hình nạp tiền
+
+DepositScreen -> Backend: Lấy số dư điểm\nGET /api/wallet/balance
+Backend -> Database: Tìm user.points
+Database -> Backend: Trả về balance
+Backend -> DepositScreen: Trả về {balance}
+DepositScreen -> User: Hiển thị số dư hiện tại
+
+User -> DepositScreen: Nhập số tiền\nChọn phương thức thanh toán
+User -> DepositScreen: Nhấn "Xác nhận nạp tiền"
+
+DepositScreen -> DepositScreen: Kiểm tra validation\n(10,000 - 50,000,000 VNĐ)
+
+alt [Phương thức: Thẻ ngân hàng (Stripe)]
+    DepositScreen -> DepositScreen: Chuyển đổi VNĐ sang USD\n(amountCents)
+    DepositScreen -> Backend: Tạo PaymentIntent\nPOST /api/payments/create-payment-intent\n{amount, currency: 'usd'}
+    Backend -> Stripe: Tạo PaymentIntent
+    Stripe -> Backend: Trả về clientSecret
+    Backend -> DepositScreen: Trả về {clientSecret}
+    
+    DepositScreen -> Stripe: Khởi tạo PaymentSheet\ninitPaymentSheet()
+    DepositScreen -> Stripe: Hiển thị PaymentSheet\npresentPaymentSheet()
+    Stripe -> User: Hiển thị form thanh toán
+    
+    alt [Thanh toán thành công]
+        Stripe -> DepositScreen: Trả về success
+        DepositScreen -> Backend: Chuyển đổi thành điểm\nPOST /api/wallet/convert\n{amountCents}
+        Backend -> Database: Cập nhật user.points\nTạo WalletTransaction
+        Database -> Backend: Cập nhật thành công
+        Backend -> DepositScreen: Trả về {pointsAdded, balance}
+        DepositScreen -> User: Hiển thị "Thanh toán thành công"
+    else [Thanh toán thất bại/hủy]
+        Stripe -> DepositScreen: Trả về error
+        DepositScreen -> User: Hiển thị thông báo lỗi
+    end
+else [Phương thức: Chuyển khoản ngân hàng]
+    DepositScreen -> Backend: Tạo yêu cầu nạp tiền\nPOST /api/wallet/deposit\n{amount, paymentMethod: 'bank_transfer'}
+    
+    Backend -> Backend: Tạo transactionId\nTạo bankInfo (accountNumber, accountName, bankName, content)
+    Backend -> DepositScreen: Trả về {transactionId, bankInfo}
+    
+    DepositScreen -> User: Hiển thị thông tin chuyển khoản\n(Số TK, Tên TK, Ngân hàng, Số tiền, Nội dung)
+    
+    User -> User: Thực hiện chuyển khoản\n(ngoài hệ thống)
+    
+    note right: Admin sẽ xác nhận\nvà cập nhật điểm sau
+end
+
+@enduml
+

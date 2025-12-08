@@ -1,0 +1,24 @@
+@startuml List Books Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Xem Danh Sách Sách (Admin)
+
+actor "Admin" as Admin
+participant "Manage Books Screen" as ManageScreen
+participant "Backend API\n(BookController)" as Backend
+participant "Database\n(MySQL)" as Database
+
+Admin -> ManageScreen: Mở màn hình quản lý sách
+
+ManageScreen -> Backend: Lấy danh sách sách\nGET /api/books/admin/all
+
+Backend -> Database: Tìm tất cả books\nJOIN với categories, authors
+Database -> Backend: Trả về danh sách books\n(với thông tin category, authors)
+
+Backend -> ManageScreen: Trả về {books}
+ManageScreen -> Admin: Hiển thị danh sách sách\n(với pagination, search, filter)
+
+@enduml
+

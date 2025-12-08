@@ -16,15 +16,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiService } from '../../../services/api';
 import { Category } from '../../../types';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 interface CategoryFormData {
   name: string;
   slug: string;
   description: string;
   parentId: string;
-  image: string;
-  icon: string;
-  sortOrder: string;
   isActive: boolean;
 }
 
@@ -36,16 +34,17 @@ const ManageCategoriesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     slug: '',
     description: '',
     parentId: '',
-    image: '',
-    icon: '',
-    sortOrder: '0',
     isActive: true,
   });
+  const [nameError, setNameError] = useState<string>('');
 
   useEffect(() => {
     loadCategories();
@@ -66,11 +65,11 @@ const ManageCategoriesScreen: React.FC = () => {
         }));
         setCategories(normalized);
       } else {
-        Alert.alert('Lỗi', response.message || 'Không thể tải danh sách chủ đề');
+        Alert.alert('Lỗi', response.message || 'Không thể tải danh sách danh mục');
       }
     } catch (error) {
       console.error('Load categories error:', error);
-      Alert.alert('Lỗi', 'Không thể tải danh sách chủ đề');
+      Alert.alert('Lỗi', 'Không thể tải danh sách danh mục');
     } finally {
       setLoading(false);
     }
@@ -116,6 +115,18 @@ const ManageCategoriesScreen: React.FC = () => {
       name,
       slug: generateSlug(name),
     }));
+    if (nameError && name.trim()) {
+      setNameError('');
+    }
+  };
+
+  const validateName = (): boolean => {
+    if (!formData.name.trim()) {
+      setNameError('Tên danh mục là bắt buộc');
+      return false;
+    }
+    setNameError('');
+    return true;
   };
 
   const resetForm = () => {
@@ -124,12 +135,10 @@ const ManageCategoriesScreen: React.FC = () => {
       slug: '',
       description: '',
       parentId: '',
-      image: '',
-      icon: '',
-      sortOrder: '0',
       isActive: true,
     });
     setEditingCategory(null);
+    setNameError('');
   };
 
   const openAddModal = () => {
@@ -143,9 +152,6 @@ const ManageCategoriesScreen: React.FC = () => {
       slug: category.slug,
       description: category.description || '',
       parentId: category.parentId?.toString() || '',
-      image: category.image || '',
-      icon: category.icon || '',
-      sortOrder: category.sortOrder.toString(),
       isActive: category.isActive,
     });
     setEditingCategory(category);
@@ -153,8 +159,12 @@ const ManageCategoriesScreen: React.FC = () => {
   };
 
   const handleSubmit = async () => {
-    if (!formData.name.trim() || !formData.slug.trim()) {
-      Alert.alert('Lỗi', 'Tên và slug là bắt buộc');
+    if (!validateName()) {
+      return;
+    }
+    
+    if (!formData.slug.trim()) {
+      Alert.alert('Lỗi', 'Slug là bắt buộc');
       return;
     }
 
@@ -164,29 +174,26 @@ const ManageCategoriesScreen: React.FC = () => {
         slug: formData.slug.trim(),
         description: formData.description.trim() || undefined,
         parentId: formData.parentId ? parseInt(formData.parentId) : undefined,
-        image: formData.image.trim() || undefined,
-        icon: formData.icon.trim() || undefined,
-        sortOrder: parseInt(formData.sortOrder) || 0,
         isActive: formData.isActive,
       };
 
       if (editingCategory) {
         const response = await apiService.updateCategory(editingCategory.id, submitData);
         if (response.success) {
-          Alert.alert('Thành công', 'Cập nhật chủ đề thành công');
+          Alert.alert('Thành công', 'Cập nhật danh mục thành công');
           setModalVisible(false);
           loadCategories();
         } else {
-          Alert.alert('Lỗi', response.message || 'Không thể cập nhật chủ đề');
+          Alert.alert('Lỗi', response.message || 'Không thể cập nhật danh mục');
         }
       } else {
         const response = await apiService.createCategory(submitData);
         if (response.success) {
-          Alert.alert('Thành công', 'Tạo chủ đề thành công');
+          Alert.alert('Thành công', 'Tạo danh mục thành công');
           setModalVisible(false);
           loadCategories();
         } else {
-          Alert.alert('Lỗi', response.message || 'Không thể tạo chủ đề');
+          Alert.alert('Lỗi', response.message || 'Không thể tạo danh mục');
         }
       }
     } catch (error) {
@@ -196,31 +203,41 @@ const ManageCategoriesScreen: React.FC = () => {
   };
 
   const handleDelete = (category: Category) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa chủ đề "${category.name}"?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await apiService.deleteCategory(category.id);
-              if (response.success) {
-                Alert.alert('Thành công', 'Xóa chủ đề thành công');
-                loadCategories();
-              } else {
-                Alert.alert('Lỗi', response.message || 'Không thể xóa chủ đề');
-              }
-            } catch (error) {
-              console.error('Delete error:', error);
-              Alert.alert('Lỗi', 'Có lỗi xảy ra khi xóa chủ đề');
-            }
-          },
-        },
-      ]
-    );
+    setCategoryToDelete(category);
+    setDeleteDialogVisible(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!categoryToDelete) return;
+
+    try {
+      setDeleting(true);
+      console.log('📂 Confirm delete category:', {
+        id: categoryToDelete.id,
+        name: categoryToDelete.name,
+      });
+      
+      const response = await apiService.deleteCategory(categoryToDelete.id);
+      if (response.success) {
+        Alert.alert('Thành công', 'Xóa danh mục thành công');
+        setDeleteDialogVisible(false);
+        setCategoryToDelete(null);
+        await loadCategories();
+      } else {
+        Alert.alert('Lỗi', response.message || 'Không thể xóa danh mục');
+      }
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      const message = error?.response?.data?.message || 'Có lỗi xảy ra khi xóa danh mục';
+      Alert.alert('Lỗi', message);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogVisible(false);
+    setCategoryToDelete(null);
   };
 
   const getParentCategories = () => {
@@ -280,14 +297,14 @@ const ManageCategoriesScreen: React.FC = () => {
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
-            placeholder="Tìm kiếm chủ đề..."
+            placeholder="Tìm kiếm danh mục..."
             value={searchQuery}
             onChangeText={handleSearchChange}
             placeholderTextColor="#999"
           />
         </View>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <Text style={styles.addButtonText}>+ Thêm chủ đề</Text>
+          <Text style={styles.addButtonText}>+ Thêm danh mục</Text>
         </TouchableOpacity>
       </View>
 
@@ -302,7 +319,7 @@ const ManageCategoriesScreen: React.FC = () => {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
-              {searchQuery.trim() ? 'Không tìm thấy chủ đề nào' : 'Chưa có chủ đề nào'}
+              {searchQuery.trim() ? 'Không tìm thấy danh mục nào' : 'Chưa có danh mục nào'}
             </Text>
           </View>
         }
@@ -316,7 +333,7 @@ const ManageCategoriesScreen: React.FC = () => {
         <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>
-              {editingCategory ? 'Sửa chủ đề' : 'Thêm chủ đề mới'}
+              {editingCategory ? 'Sửa danh mục' : 'Thêm danh mục mới'}
             </Text>
             <TouchableOpacity
               style={styles.closeButton}
@@ -328,13 +345,17 @@ const ManageCategoriesScreen: React.FC = () => {
 
           <ScrollView style={styles.modalContent}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Tên chủ đề *</Text>
+              <Text style={styles.label}>Tên danh mục *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, nameError && styles.inputError]}
                 value={formData.name}
                 onChangeText={handleNameChange}
-                placeholder="Nhập tên chủ đề"
+                onBlur={validateName}
+                placeholder="Nhập tên danh mục"
               />
+              {nameError ? (
+                <Text style={styles.errorText}>{nameError}</Text>
+              ) : null}
             </View>
 
             <View style={styles.formGroup}>
@@ -343,7 +364,7 @@ const ManageCategoriesScreen: React.FC = () => {
                 style={styles.input}
                 value={formData.slug}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, slug: text }))}
-                placeholder="slug-chu-de"
+                placeholder="slug-danh-muc"
               />
             </View>
 
@@ -353,7 +374,7 @@ const ManageCategoriesScreen: React.FC = () => {
                 style={[styles.input, styles.textArea]}
                 value={formData.description}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
-                placeholder="Nhập mô tả chủ đề"
+                placeholder="Nhập mô tả danh mục"
                 multiline
                 numberOfLines={3}
               />
@@ -365,38 +386,7 @@ const ManageCategoriesScreen: React.FC = () => {
                 style={styles.input}
                 value={formData.parentId}
                 onChangeText={(text) => setFormData(prev => ({ ...prev, parentId: text }))}
-                placeholder="ID chủ đề cha (để trống nếu là chủ đề gốc)"
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>URL hình ảnh</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.image}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, image: text }))}
-                placeholder="https://example.com/image.jpg"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Icon</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.icon}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, icon: text }))}
-                placeholder="📚"
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Thứ tự sắp xếp</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.sortOrder}
-                onChangeText={(text) => setFormData(prev => ({ ...prev, sortOrder: text }))}
-                placeholder="0"
+                placeholder="ID danh mục cha (để trống nếu là danh mục gốc)"
                 keyboardType="numeric"
               />
             </View>
@@ -424,6 +414,22 @@ const ManageCategoriesScreen: React.FC = () => {
           </View>
         </SafeAreaView>
       </Modal>
+
+      <ConfirmDialog
+        visible={deleteDialogVisible}
+        title="🗑️ Xác nhận xóa danh mục"
+        message={
+          categoryToDelete
+            ? `Bạn có chắc chắn muốn xóa danh mục "${categoryToDelete.name}"?\n\n⚠️ Không thể hoàn tác.`
+            : ''
+        }
+        confirmText="🗑️ Xóa"
+        cancelText="❌ Hủy"
+        type="danger"
+        loading={deleting}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </SafeAreaView>
   );
 };
@@ -629,6 +635,15 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     backgroundColor: '#fff',
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 12,
+    marginTop: 4,
   },
   textArea: {
     height: 80,

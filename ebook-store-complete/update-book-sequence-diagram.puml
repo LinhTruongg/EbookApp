@@ -1,0 +1,69 @@
+@startuml Update Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Cập Nhật Sách (Admin)
+
+actor "Admin" as Admin
+participant "Manage Books Screen" as ManageScreen
+participant "Backend API\n(BookController)" as Backend
+participant "Cloudinary\n(File Storage)" as Cloudinary
+participant "Database\n(MySQL)" as Database
+
+Admin -> ManageScreen: Chọn sách cần sửa
+ManageScreen -> Backend: Lấy thông tin sách\nGET /api/books/admin/{id}
+Backend -> Database: Tìm book theo ID
+Database -> Backend: Trả về book với relations
+Backend -> ManageScreen: Trả về {book}
+ManageScreen -> Admin: Hiển thị form với dữ liệu hiện tại
+
+Admin -> ManageScreen: Sửa thông tin\n(title, description, category, ...)
+Admin -> ManageScreen: Upload file mới (nếu có)
+Admin -> ManageScreen: Nhấn "Lưu"
+
+ManageScreen -> ManageScreen: Validate form data
+
+ManageScreen -> Backend: Cập nhật sách\nPUT /api/books/admin/{id}\nFormData {title, description, ...}
+
+Backend -> Database: Tìm book theo ID
+Database -> Backend: Trả về book
+
+alt [Book không tồn tại]
+    Backend -> ManageScreen: Trả về lỗi\n{success: false, message: "Không tìm thấy sách"}
+    ManageScreen -> Admin: Hiển thị thông báo lỗi
+else [Book tồn tại]
+    alt [Có upload cover image mới]
+        Backend -> Cloudinary: Upload cover image mới
+        Cloudinary -> Backend: Trả về coverImage URL mới
+    end
+    
+    alt [Có upload file PDF mới]
+        Backend -> Cloudinary: Upload PDF file mới
+        Cloudinary -> Backend: Trả về fileUrl mới
+    end
+    
+    Backend -> Database: Cập nhật Book record\nUPDATE books SET ...
+    Database -> Backend: Cập nhật thành công
+    
+    alt [Có thay đổi authors]
+        Backend -> Database: Xóa liên kết authors cũ
+        Backend -> Database: Tạo liên kết authors mới\nINSERT INTO book_authors
+        Database -> Backend: Cập nhật thành công
+    end
+    
+    alt [Có thay đổi category]
+        Backend -> Database: Cập nhật category.bookCount\n(category cũ và mới)
+        Database -> Backend: Cập nhật thành công
+    end
+    
+    Backend -> Database: Log admin activity
+    Database -> Backend: Log thành công
+    
+    Backend -> ManageScreen: Trả về thành công\n{book}
+    ManageScreen -> Admin: Hiển thị "Cập nhật thành công"
+    ManageScreen -> ManageScreen: Reload danh sách sách
+end
+
+@enduml
+

@@ -198,26 +198,6 @@ function ProfileScreen() {
         </View>
       </View>
 
-
-      {/* Reading Progress */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>📈 Tiến độ đọc</Text>
-        <View style={styles.progressCard}>
-          <View style={styles.progressItem}>
-            <Text style={styles.progressNumber}>12</Text>
-            <Text style={styles.progressLabel}>Sách đã đọc</Text>
-          </View>
-          <View style={styles.progressItem}>
-            <Text style={styles.progressNumber}>3,240</Text>
-            <Text style={styles.progressLabel}>Trang đã đọc</Text>
-          </View>
-          <View style={styles.progressItem}>
-            <Text style={styles.progressNumber}>45h</Text>
-            <Text style={styles.progressLabel}>Thời gian đọc</Text>
-          </View>
-        </View>
-      </View>
-
       {/* Actions Section */}
       <View style={styles.actionsSection}>
         <TouchableOpacity

@@ -270,10 +270,17 @@ class CategoryController {
       const { name, slug, description, parentId, image, icon, sortOrder } = req.body;
 
       // Validate required fields
-      if (!name || !slug) {
+      if (!name || !name.trim()) {
         return res.status(400).json({
           success: false,
-          message: 'Tên và slug là bắt buộc'
+          message: 'Tên danh mục là bắt buộc'
+        });
+      }
+      
+      if (!slug || !slug.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Slug là bắt buộc'
         });
       }
 
@@ -377,6 +384,14 @@ class CategoryController {
         }
       }
 
+      // Validate required fields
+      if (name !== undefined && (!name || !name.trim())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Tên danh mục là bắt buộc'
+        });
+      }
+
       // Validate parent category if provided
       if (parentId && parentId !== category.parentId) {
         if (parentId === id) {
@@ -396,7 +411,7 @@ class CategoryController {
       }
 
       await category.update({
-        name: name || category.name,
+        name: name !== undefined ? (name.trim() || category.name) : category.name,
         slug: slug || category.slug,
         description: description !== undefined ? description : category.description,
         parentId: parentId !== undefined ? parentId : category.parentId,

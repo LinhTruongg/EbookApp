@@ -70,7 +70,6 @@ class AuthorController {
         avatar,
         birthDate,
         nationality,
-        website,
         socialLinks,
         isActive = true,
       } = req.body;
@@ -85,7 +84,6 @@ class AuthorController {
         avatar,
         birth_date: birthDate || null,
         nationality: nationality || null,
-        website: website || null,
         social_links: socialLinks || null,
         is_active: Boolean(isActive),
       });
@@ -113,7 +111,6 @@ class AuthorController {
         avatar,
         birthDate,
         nationality,
-        website,
         socialLinks,
         isActive,
       } = req.body;
@@ -125,7 +122,6 @@ class AuthorController {
         avatar: avatar ?? author.avatar,
         birth_date: birthDate !== undefined ? birthDate : author.birth_date,
         nationality: nationality !== undefined ? nationality : author.nationality,
-        website: website !== undefined ? website : author.website,
         social_links: socialLinks !== undefined ? socialLinks : author.social_links,
         is_active: typeof isActive === 'boolean' ? isActive : author.is_active,
       });

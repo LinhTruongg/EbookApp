@@ -16,6 +16,7 @@ import {
 import { apiService } from '../../../services/api';
 import { User } from '../../../types';
 import DateTimeField from '../../../components/common/DateTimeField';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 interface ManageUsersScreenProps {
   route?: {
@@ -34,6 +35,9 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
   const [modalVisible, setModalVisible] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -180,64 +184,36 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
   };
 
   const handleDelete = (user: User) => {
-    Alert.alert(
-      'Xác nhận xóa',
-      `Bạn có chắc chắn muốn xóa người dùng "${user.firstName} ${user.lastName}"?`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await apiService.deleteUser(user.id.toString());
-              if (response.success) {
-                Alert.alert('Thành công', response.message || 'Xóa người dùng thành công');
-                loadUsers();
-              } else {
-                Alert.alert('Lỗi', response.message || 'Không thể xóa người dùng');
-              }
-            } catch (error) {
-              console.error('Delete error:', error);
-              Alert.alert('Lỗi', 'Có lỗi xảy ra khi xóa người dùng');
-            }
-          },
-        },
-      ]
-    );
+    setUserToDelete(user);
+    setDeleteDialogVisible(true);
   };
 
-  const handleResetPassword = (user: User) => {
-    Alert.prompt(
-      'Đặt lại mật khẩu',
-      `Nhập mật khẩu mới cho ${user.firstName} ${user.lastName}:`,
-      [
-        { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Đặt lại',
-          onPress: async (newPassword) => {
-            if (!newPassword || newPassword.trim().length < 6) {
-              Alert.alert('Lỗi', 'Mật khẩu phải có ít nhất 6 ký tự');
-              return;
-            }
-            try {
-              const response = await apiService.resetUserPassword(user.id.toString(), newPassword.trim());
-              if (response.success) {
-                Alert.alert('Thành công', 'Đặt lại mật khẩu thành công');
-              } else {
-                Alert.alert('Lỗi', response.message || 'Không thể đặt lại mật khẩu');
-              }
-            } catch (error) {
-              console.error('Reset password error:', error);
-              Alert.alert('Lỗi', 'Có lỗi xảy ra khi đặt lại mật khẩu');
-            }
-          },
-        },
-      ],
-      'secure-text'
-    );
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    
+    try {
+      setDeleteLoading(true);
+      const response = await apiService.deleteUser(userToDelete.id.toString());
+      if (response.success) {
+        Alert.alert('Thành công', response.message || 'Xóa người dùng thành công');
+        setDeleteDialogVisible(false);
+        setUserToDelete(null);
+        loadUsers();
+      } else {
+        Alert.alert('Lỗi', response.message || 'Không thể xóa người dùng');
+      }
+    } catch (error) {
+      console.error('Delete error:', error);
+      Alert.alert('Lỗi', 'Có lỗi xảy ra khi xóa người dùng');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
+  const cancelDelete = () => {
+    setDeleteDialogVisible(false);
+    setUserToDelete(null);
+  };
 
   const renderUserItem = ({ item }: { item: User }) => (
     <View style={styles.userItem}>
@@ -278,13 +254,6 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
           accessibilityLabel="Sửa"
         >
           <Text style={styles.editButtonText}>Sửa</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.resetPasswordButton}
-          onPress={() => handleResetPassword(item)}
-          accessibilityLabel="Reset mật khẩu"
-        >
-          <Text style={styles.resetPasswordButtonText}>Reset</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteButton}
@@ -546,6 +515,22 @@ const ManageUsersScreen: React.FC<ManageUsersScreenProps> = ({ route, navigation
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      <ConfirmDialog
+        visible={deleteDialogVisible}
+        title="🗑️ Xác nhận xóa người dùng"
+        message={
+          userToDelete
+            ? `Bạn có chắc chắn muốn xóa người dùng "${userToDelete.firstName} ${userToDelete.lastName}"?\n\n⚠️ Hành động này không thể hoàn tác.`
+            : ''
+        }
+        confirmText="🗑️ Xóa"
+        cancelText="❌ Hủy"
+        type="danger"
+        loading={deleteLoading}
+        onConfirm={confirmDelete}
+        onCancel={cancelDelete}
+      />
     </SafeAreaView>
   );
 };
@@ -671,19 +656,6 @@ const styles = StyleSheet.create({
     minWidth: 50,
   },
   editButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  resetPasswordButton: {
-    backgroundColor: '#F59E0B',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-    minWidth: 50,
-  },
-  resetPasswordButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '600',

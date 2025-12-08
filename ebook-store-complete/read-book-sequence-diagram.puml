@@ -1,0 +1,51 @@
+@startuml Read Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Chức năng Đọc Sách
+
+actor "Người dùng" as User
+participant "Book Reader Screen" as ReaderScreen
+participant "Backend API" as Backend
+participant "Database\n(MySQL)" as Database
+
+User -> ReaderScreen: Mở sách để đọc
+
+ReaderScreen -> Backend: Lấy thông tin sách\nGET /api/books/{bookId}
+Backend -> Database: Tìm sách theo ID
+Database -> Backend: Trả về thông tin sách
+Backend -> ReaderScreen: Trả về dữ liệu sách\n{book, fileUrl}
+
+ReaderScreen -> Backend: Lấy reading session\nGET /api/users/reading-session/{bookId}
+Backend -> Database: Tìm reading session
+Database -> Backend: Trả về session (currentPage, progress)
+Backend -> ReaderScreen: Trả về session data
+
+ReaderScreen -> User: Hiển thị PDF viewer\nTải sách từ fileUrl
+
+User -> ReaderScreen: Đọc sách, lật trang
+
+ReaderScreen -> ReaderScreen: Theo dõi trang hiện tại\n(debounce 2 giây)
+
+ReaderScreen -> Backend: Cập nhật tiến độ đọc\nPUT /api/users/reading-progress/{bookId}\n{progress, pageNumber}
+
+Backend -> Database: Kiểm tra sách trong library
+alt [Chưa có trong library]
+    Backend -> Database: Thêm vào library\nTạo UserLibrary record
+end
+
+Backend -> Database: Cập nhật readingProgress\ncurrentPage, lastReadAt
+Database -> Backend: Cập nhật thành công
+Backend -> ReaderScreen: Trả về thành công
+
+alt [Đọc đến trang cuối]
+    ReaderScreen -> Backend: Đánh dấu hoàn thành\nPOST /api/users/complete-book\n{bookId}
+    Backend -> Database: Cập nhật readingProgress = 100\nisCompleted = true
+    Database -> Backend: Cập nhật thành công
+    Backend -> ReaderScreen: Trả về thành công
+    ReaderScreen -> User: Hiển thị thông báo "Đã hoàn thành"
+end
+
+@enduml
+

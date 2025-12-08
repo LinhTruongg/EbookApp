@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -17,7 +17,12 @@ import { COLORS, SIZES } from '../../../constants';
 import { simpleApiService } from '../../../services/simpleApi';
 import { Book } from '../../../types';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import SearchBar from '../../../components/common/SearchBar';
+import Chatbot from '../../../components/common/Chatbot';
+import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { eventBus } from '../../../utils/eventBus';
 
 const { width: screenWidth } = Dimensions.get('window');
 
@@ -35,6 +40,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
   const [newReleaseBooks, setNewReleaseBooks] = useState<Book[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showChatbot, setShowChatbot] = useState(false);
   
 
   console.log('🏠 HomeScreen - RENDERED! Welcome to the app!');
@@ -42,7 +48,35 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
 
   useEffect(() => {
     loadBooksData();
+    
+    const unsubscribe = eventBus.on('chatbot:reopen', () => {
+      setShowChatbot(true);
+      AsyncStorage.removeItem('shouldReopenChatbot').catch(() => {});
+    });
+    
+    return () => {
+      unsubscribe();
+    };
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      const checkAndReopenChatbot = async () => {
+        try {
+          const shouldReopen = await AsyncStorage.getItem('shouldReopenChatbot');
+          if (shouldReopen === 'true') {
+            setTimeout(() => {
+              setShowChatbot(true);
+              AsyncStorage.removeItem('shouldReopenChatbot').catch(() => {});
+            }, 200);
+          }
+        } catch (e) {
+          // Silently handle error
+        }
+      };
+      checkAndReopenChatbot();
+    }, [])
+  );
 
 
   const loadBooksData = async () => {
@@ -141,7 +175,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
 
   const renderBookItem = ({ item }: { item: Book }) => {
     const authors = item.authors?.map(author => author.name).join(', ') || 'Unknown';
-    // Removed price logic as this is now a free reading app
+    const pointsRequired = Number((item as any).pointsRequired || 0);
+    const isLockedByPoints = Boolean((item as any).isLockedByPoints);
+    const requiresPoints = pointsRequired > 0 || isLockedByPoints;
     
     return (
       <TouchableOpacity 
@@ -157,9 +193,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
         />
         <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
         <Text style={styles.bookAuthor} numberOfLines={1}>{authors}</Text>
-        <Text style={styles.bookPrice}>
-          Đọc miễn phí
-        </Text>
+        {!requiresPoints && (
+          <Text style={styles.bookPrice}>
+            Đọc miễn phí
+          </Text>
+        )}
         {item.rating && parseFloat(item.rating) > 0 && (
           <View style={styles.ratingContainer}>
             <Text style={styles.ratingText}>⭐ {item.rating}</Text>
@@ -324,6 +362,20 @@ const HomeScreen: React.FC<HomeScreenProps> = ({  }) => {
         )}
       </ScrollView>
 
+      {/* Floating Chatbot Button */}
+      <TouchableOpacity
+        style={styles.chatbotButton}
+        onPress={() => setShowChatbot(true)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="chatbubbles" size={24} color={COLORS.white} />
+      </TouchableOpacity>
+
+      {/* Chatbot Modal */}
+      <Chatbot
+        visible={showChatbot}
+        onClose={() => setShowChatbot(false)}
+      />
     </View>
   );
 }
@@ -528,6 +580,25 @@ const styles = StyleSheet.create({
     color: COLORS.text,
     paddingHorizontal: SIZES.spacing.lg,
     marginBottom: SIZES.spacing.md,
+  },
+  chatbotButton: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
   },
 
 });

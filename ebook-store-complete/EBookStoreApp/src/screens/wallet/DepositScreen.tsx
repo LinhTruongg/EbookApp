@@ -146,6 +146,11 @@ export default function DepositScreen() {
 
         const present = await presentPaymentSheet();
         if (present.error) {
+          const errorCode = present.error.code || '';
+          if (errorCode === 'Canceled' || errorCode === 'Failed' || present.error.message?.includes('cancel')) {
+            setIsSubmitting(false);
+            return;
+          }
           throw new Error(present.error.message || 'Thanh toán thất bại');
         }
 
@@ -159,9 +164,16 @@ export default function DepositScreen() {
             }
           }
           Toast.show({ type: 'success', text1: 'Thanh toán thành công', text2: 'Điểm đã được cộng' });
-        } catch {}
+          router.back();
+        } catch (convertError: any) {
+          console.error('Error converting to points:', convertError);
+          Toast.show({
+            type: 'error',
+            text1: 'Lỗi',
+            text2: convertError.response?.data?.message || convertError.message || 'Không thể cộng điểm. Vui lòng liên hệ hỗ trợ.',
+          });
+        }
         setIsSubmitting(false);
-        router.back();
         return;
       }
 

@@ -1,4 +1,4 @@
-const { User, UserLibrary, Book, Category, Author, Wishlist, Bookmark } = require('../models');
+const { User, UserLibrary, Book, Category, Author, Wishlist, Bookmark, Review, Comment, Rating } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const ActivityLogger = require('../utils/activityLogger');
@@ -881,14 +881,17 @@ class UserController {
         });
       }
 
-      // Check if user has any library entries or reviews
+      // Check if user has any related data
       const hasLibrary = await UserLibrary.findOne({ where: { userId: id } });
       const hasWishlist = await Wishlist.findOne({ where: { userId: id } });
       const hasBookmarks = await Bookmark.findOne({ where: { userId: id } });
+      const hasReviews = await Review.findOne({ where: { userId: id } });
+      const hasComments = await Comment.findOne({ where: { userId: id } });
+      const hasRatings = await Rating.findOne({ where: { userId: id } });
 
       const userName = user.getFullName();
       
-      if (hasLibrary || hasWishlist || hasBookmarks) {
+      if (hasLibrary || hasWishlist || hasBookmarks || hasReviews || hasComments || hasRatings) {
         // Soft delete - just deactivate
         await user.update({ isActive: false });
         

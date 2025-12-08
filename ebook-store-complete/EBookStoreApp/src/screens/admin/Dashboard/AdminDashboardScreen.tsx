@@ -232,31 +232,37 @@ const DashboardContent = ({ user }: { user: any }) => {
 
       {/* Export Buttons */}
       <View style={styles.exportSection}>
+        <ExportExcel
+          revenueData={revenueData}
+          userGrowthData={userGrowthData}
+          dashboardStats={stats}
+          fileName="Dashboard_Report"
+          exportType="all"
+          buttonText="Xuất Tất Cả"
+          isPrimary={true}
+        />
         <View style={styles.exportButtonsRow}>
-          <ExportExcel
-            revenueData={revenueData}
-            userGrowthData={null}
-            dashboardStats={null}
-            fileName="Dashboard_Report"
-            exportType="revenue"
-            buttonText="📊 Xuất Doanh Thu"
-          />
-          <ExportExcel
-            revenueData={null}
-            userGrowthData={userGrowthData}
-            dashboardStats={null}
-            fileName="Dashboard_Report"
-            exportType="userGrowth"
-            buttonText="📈 Xuất Tăng Trưởng"
-          />
-          <ExportExcel
-            revenueData={revenueData}
-            userGrowthData={userGrowthData}
-            dashboardStats={stats}
-            fileName="Dashboard_Report"
-            exportType="all"
-            buttonText="📋 Xuất Tất Cả"
-          />
+          <View style={styles.exportButtonWrapper}>
+            <ExportExcel
+              revenueData={null}
+              userGrowthData={userGrowthData}
+              dashboardStats={null}
+              fileName="Dashboard_Report"
+              exportType="userGrowth"
+              buttonText="Xuất Tăng Trưởng"
+            />
+          </View>
+          <View style={styles.separator} />
+          <View style={styles.exportButtonWrapper}>
+            <ExportExcel
+              revenueData={revenueData}
+              userGrowthData={null}
+              dashboardStats={null}
+              fileName="Dashboard_Report"
+              exportType="revenue"
+              buttonText="Xuất Doanh Thu"
+            />
+          </View>
         </View>
       </View>
 
@@ -411,12 +417,32 @@ const styles = StyleSheet.create({
   },
   exportSection: {
     marginBottom: 16,
+    gap: 12,
   },
   exportButtonsRow: {
     flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  exportButtonWrapper: {
+    flex: 1,
+  },
+  separator: {
+    width: 1,
+    height: 32,
+    backgroundColor: '#E5E7EB',
+    marginHorizontal: 8,
   },
   chartsRow: {
     flexDirection: width > 768 ? 'row' : 'column',

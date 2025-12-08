@@ -12,16 +12,23 @@ import { Platform } from 'react-native';
 // Suppress React Native Web warnings
 import '../src/utils/suppressWarnings.js';
 
-// Suppress expo-updates errors globally
+// Suppress expo-updates errors and Stripe warnings globally
 if (typeof global !== 'undefined') {
   const originalConsoleError = console.error;
   console.error = (...args: any[]) => {
-    const message = args.join(' ');
+    const message = args.map(arg => typeof arg === 'string' ? arg : JSON.stringify(arg || '')).join(' ');
     if (message?.includes('Failed to download remote update') || 
         message?.includes('expo-updates') ||
         message?.includes('Updates') ||
-        message?.includes('java.io.IOException')) {
-      console.warn('⚠️ Suppressing updates error:', message);
+        message?.includes('java.io.IOException') ||
+        message?.includes('StripeKeepJsAwakeTask') ||
+        message?.includes('No task registered for key') ||
+        message?.includes('status code 401') ||
+        message?.includes('ERR_BAD_REQUEST') ||
+        message?.includes('Email hoặc mật khẩu không đúng') ||
+        message?.includes('SimpleApiService.login error') ||
+        message?.includes('AuthContext.login error') ||
+        (message?.includes('status') && message?.includes('401'))) {
       return;
     }
     originalConsoleError.apply(console, args);

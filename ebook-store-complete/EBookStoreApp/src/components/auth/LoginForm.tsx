@@ -13,22 +13,38 @@ import { COLORS, SIZES, COMMON_STYLES } from '../../constants';
 import { useRouter } from 'expo-router';
 
 const LoginForm: React.FC = () => {
-  const [email, setEmail] = useState('nguyenvanan@gmail.com'); // Pre-filled for demo
-  const [password, setPassword] = useState('123456'); // Pre-filled for demo
+  const [email, setEmail] = useState('nguyenvanan@gmail.com');
+  const [password, setPassword] = useState('123456');
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const { login, isLoading, user } = useAuth();
   const router = useRouter();
 
 
   const handleLogin = async () => {
+    setEmailError('');
+    setPasswordError('');
+    
+    let hasError = false;
+    
+    if (!email || !email.trim()) {
+      setEmailError('Vui lòng nhập email');
+      hasError = true;
+    }
+    
+    if (!password || !password.trim()) {
+      setPasswordError('Vui lòng nhập mật khẩu');
+      hasError = true;
+    }
+    
+    if (hasError) {
+      return;
+    }
+    
     try {
     console.log('🔵 LoginForm.handleLogin called with:', { email });
     console.log('🔵 Current environment:', __DEV__ ? 'development' : 'production');
     console.log('🔵 Window object exists:', typeof window !== 'undefined');
-    
-    if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
-      return;
-    }
 
       console.log('🔵 LoginForm calling login from AuthContext...');
       const loggedInUser = await login(email, password);
@@ -52,15 +68,19 @@ const LoginForm: React.FC = () => {
         Alert.alert('Error', 'Login successful but user data is invalid.');
       }
     } catch (error: any) {
-      console.error('❌ LoginForm login error:', error);
-      console.error('❌ Error details:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        statusText: error?.response?.statusText,
-        config: error?.config?.url,
-        code: error?.code
-      });
+      const isAuthError = error?.response?.status === 401 || error?.response?.status === 403 || error?.status === 401 || error?.status === 403;
+      
+      if (!isAuthError && __DEV__) {
+        console.error('❌ LoginForm login error:', error);
+        console.error('❌ Error details:', {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+          statusText: error?.response?.statusText,
+          config: error?.config?.url,
+          code: error?.code
+        });
+      }
       
       let errorMessage = 'Invalid email or password';
       
@@ -79,7 +99,9 @@ const LoginForm: React.FC = () => {
       try {
       Alert.alert('Login Failed', errorMessage);
       } catch (alertError) {
-        console.error('❌ Alert.alert error:', alertError);
+        if (__DEV__) {
+          console.error('❌ Alert.alert error:', alertError);
+        }
       }
     }
   };
@@ -96,15 +118,19 @@ const LoginForm: React.FC = () => {
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Email</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, emailError && styles.inputError]}
             placeholder="Nhập email của bạn"
             placeholderTextColor={COLORS.textPlaceholder}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={(text) => {
+              setEmail(text);
+              if (emailError) setEmailError('');
+            }}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
         </View>
         
         <View style={styles.inputContainer}>
@@ -112,15 +138,19 @@ const LoginForm: React.FC = () => {
             <Text style={styles.label}>Mật khẩu</Text>
           </View>
           <TextInput
-            style={styles.input}
+            style={[styles.input, passwordError && styles.inputError]}
             placeholder="Nhập mật khẩu"
             placeholderTextColor={COLORS.textPlaceholder}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={(text) => {
+              setPassword(text);
+              if (passwordError) setPasswordError('');
+            }}
             secureTextEntry
             autoCapitalize="none"
             autoCorrect={false}
           />
+          {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
         </View>
 
         <TouchableOpacity
@@ -184,6 +214,15 @@ const styles = StyleSheet.create({
   input: {
     ...COMMON_STYLES.input,
     fontSize: SIZES.font.md,
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    borderWidth: 1,
+  },
+  errorText: {
+    fontSize: SIZES.font.sm,
+    color: '#ef4444',
+    marginTop: SIZES.spacing.xs,
   },
   button: {
     ...COMMON_STYLES.buttonPrimary,

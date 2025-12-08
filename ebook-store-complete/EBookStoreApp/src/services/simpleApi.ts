@@ -69,12 +69,16 @@ class SimpleApiService {
         throw new Error('Invalid response from server');
       }
     } catch (error: any) {
-      console.error('❌ SimpleApiService.login error:', {
-        message: error?.message,
-        response: error?.response?.data,
-        status: error?.response?.status,
-        code: error?.code
-      });
+      const isAuthError = error?.response?.status === 401 || error?.response?.status === 403;
+      
+      if (!isAuthError && __DEV__) {
+        console.error('❌ SimpleApiService.login error:', {
+          message: error?.message,
+          response: error?.response?.data,
+          status: error?.response?.status,
+          code: error?.code
+        });
+      }
       
       // Re-throw with better error structure
       if (error?.response?.data) {

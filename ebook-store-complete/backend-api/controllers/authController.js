@@ -1061,6 +1061,89 @@ class AuthController {
       throw new Error(`Không thể gửi email khôi phục: ${err.message}`);
     }
   }
+
+  async sendPurchaseConfirmationEmail(email, bookTitle, pointsUsed, transactionTime) {
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_PASS) {
+      console.warn('⚠️ Gmail credentials not found in environment variables');
+      throw new Error('Email service not configured');
+    }
+
+    console.log(`📧 Attempting to send purchase confirmation to ${email}...`);
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 465,
+      secure: true,
+      auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_PASS
+      }
+    });
+
+    try {
+      await transporter.verify();
+      console.log('✅ SMTP server connection verified');
+    } catch (verifyError) {
+      console.error('❌ SMTP verification failed:', verifyError);
+      throw new Error('Không thể kết nối đến dịch vụ email. Vui lòng kiểm tra cấu hình Gmail.');
+    }
+
+    const senderName = process.env.EMAIL_SENDER_NAME || 'EBook Store';
+    const senderEmail = process.env.GMAIL_USER;
+
+    const formattedTime = new Date(transactionTime).toLocaleString('vi-VN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+
+    const mailOptions = {
+      from: {
+        name: senderName,
+        address: senderEmail
+      },
+      to: email,
+      subject: 'Xác nhận mua sách thành công',
+      text: `Bạn đã mua sách "${bookTitle}" thành công.\nSố điểm đã sử dụng: ${pointsUsed.toLocaleString('vi-VN')} điểm\nThời gian giao dịch: ${formattedTime}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2563EB;">Xác nhận mua sách thành công</h2>
+          <p>Cảm ơn bạn đã mua sách trên EBook Store!</p>
+          <div style="background-color: #F3F4F6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #6B7280; margin-bottom: 10px;"><strong>Tên sách:</strong></p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #1F2937; margin-bottom: 20px;">${bookTitle}</p>
+            <p style="margin: 0; font-size: 14px; color: #6B7280; margin-bottom: 10px;"><strong>Số điểm đã sử dụng:</strong></p>
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #2563EB; margin-bottom: 20px;">${pointsUsed.toLocaleString('vi-VN')} điểm</p>
+            <p style="margin: 0; font-size: 14px; color: #6B7280; margin-bottom: 10px;"><strong>Thời gian giao dịch:</strong></p>
+            <p style="margin: 0; font-size: 16px; color: #1F2937;">${formattedTime}</p>
+          </div>
+          <p style="color: #6B7280; font-size: 14px;">Bạn có thể đọc sách ngay bây giờ trong thư viện của mình.</p>
+          <p style="color: #6B7280; font-size: 12px; margin-top: 30px;">Nếu bạn không thực hiện giao dịch này, vui lòng liên hệ với chúng tôi ngay lập tức.</p>
+        </div>
+      `
+    };
+
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log(`✅ Purchase confirmation email sent successfully to ${email}`);
+      console.log(`📬 Message ID: ${info.messageId}`);
+      return info;
+    } catch (err) {
+      console.error('❌ Send purchase confirmation email error:', err);
+      if (err.code === 'EAUTH') {
+        throw new Error('Xác thực Gmail thất bại. Vui lòng kiểm tra GMAIL_USER và GMAIL_PASS trong file .env');
+      } else if (err.code === 'ECONNECTION') {
+        throw new Error('Không thể kết nối đến SMTP server. Vui lòng kiểm tra kết nối internet.');
+      } else if (err.responseCode === 535) {
+        throw new Error('Tài khoản Gmail không hợp lệ hoặc chưa bật "Less secure app access". Vui lòng sử dụng App Password.');
+      }
+      throw new Error(`Không thể gửi email xác nhận mua sách: ${err.message}`);
+    }
+  }
 }
 
 module.exports = new AuthController();

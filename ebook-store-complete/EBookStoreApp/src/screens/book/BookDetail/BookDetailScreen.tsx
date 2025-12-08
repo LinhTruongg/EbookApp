@@ -19,10 +19,12 @@ import { apiService } from '../../../services/api';
 import { simpleApiService } from '../../../services/simpleApi';
 import { useAuth } from '../../../context/AuthContext';
 import { eventBus } from '../../../utils/eventBus';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import StarRating from '../../../components/common/StarRating';
 import RatingDistributionChart from '../../../components/common/RatingDistributionChart';
 import LoadingStarRating from '../../../components/common/LoadingStarRating';
 import { Ionicons } from '@expo/vector-icons';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
 
 interface BookDetailScreenProps {
   book: Book;
@@ -56,6 +58,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
   const [unlockLoading, setUnlockLoading] = useState<boolean>(false);
   const [isLiked, setIsLiked] = useState<boolean>(initialHasLiked || book.hasLiked || false);
   const [likeCount, setLikeCount] = useState<number>(initialLikeCount || book.likesCount || 0);
+  const [showPurchaseConfirm, setShowPurchaseConfirm] = useState<boolean>(false);
 
   const authors = book.authors?.map(author => author.name).join(', ') || 'Unknown Author';
   const [requiresPoints, setRequiresPoints] = useState<boolean>((((book as any).pointsRequired ?? 0) > 0) || (book as any).isLockedByPoints);
@@ -106,7 +109,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
     checkUnlocked();
   }, [book.id]);
 
-  const handlePurchaseBook = async () => {
+  const handlePurchaseBook = () => {
     if (!user) {
       Alert.alert('Yêu cầu đăng nhập', 'Vui lòng đăng nhập để mua sách.');
       try {
@@ -139,6 +142,17 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
       return;
     }
 
+    console.log('Showing purchase confirm dialog', { 
+      userPoints, 
+      requiredPoints, 
+      bookTitle: book.title 
+    });
+    setShowPurchaseConfirm(true);
+  };
+
+  const executePurchase = async () => {
+    setShowPurchaseConfirm(false);
+    
     try {
       setUnlockLoading(true);
       const response = await apiService.purchaseBookWithPoints({ 
@@ -199,11 +213,18 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
     }
   };
 
-  const handleGoBack = () => {
+  const handleGoBack = async () => {
     try {
+      const shouldReopenChatbot = await AsyncStorage.getItem('shouldReopenChatbot');
+      
       const canGoBack = typeof (router as any).canGoBack === 'function' ? (router as any).canGoBack() : false;
       if (canGoBack) {
         router.back();
+        if (shouldReopenChatbot === 'true') {
+          setTimeout(() => {
+            eventBus.emit('chatbot:reopen', {});
+          }, 300);
+        }
       } else {
         router.replace('/');
       }
@@ -306,11 +327,20 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
       const res = await apiService.createComment(book.id, { content });
       if (res.success && res.data) {
         setNewComment('');
-        // Prepend new comment
-        setComments(prev => [res.data as unknown as Comment, ...prev]);
+        // Prepend new comment only if approved
+        if (!res.isPending) {
+          setComments(prev => [res.data as unknown as Comment, ...prev]);
+        }
+        // Show notification message
+        if (res.message) {
+          Alert.alert(
+            res.isPending ? 'Thông báo' : 'Thành công',
+            res.message
+          );
+        }
       }
     } catch (e: any) {
-      // Silently handle error - comment posting failed
+      Alert.alert('Lỗi', e.response?.data?.message || 'Không thể đăng bình luận');
     } finally {
       setPosting(false);
     }
@@ -435,10 +465,11 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
               )}
             </View>
 
-            {/* Category */}
-            {book.categories && book.categories.length > 0 && (
+            {((book as any).category || (book as any).categories?.length > 0) && (
               <View style={styles.categoryContainer}>
-                <Text style={styles.categoryText}>📂 {book.categories[0].name}</Text>
+                <Text style={styles.categoryText}>
+                  📂 {((book as any).category?.name) || (book as any).categories?.[0]?.name}
+                </Text>
               </View>
             )}
 
@@ -582,7 +613,7 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
       {/* Suggested Books */}
       {suggestedBooks.length > 0 && (
         <View style={styles.suggestedSection}>
-          <Text style={styles.sectionTitle}>Sách cùng chủ đề</Text>
+          <Text style={styles.sectionTitle}>Sách cùng danh mục</Text>
           {suggestedLoading ? (
             <View style={styles.suggestedLoading}>
               <ActivityIndicator color={COLORS.primary} />
@@ -658,6 +689,23 @@ const BookDetailScreen: React.FC<BookDetailScreenProps> = ({
           </TouchableOpacity>
         )}
       </View>
+
+      <ConfirmDialog
+        visible={showPurchaseConfirm}
+        title="Xác nhận mua sách"
+        message={requiredPoints > 0 
+          ? `Bạn có chắc chắn muốn mua sách "${book.title}" với ${requiredPoints.toLocaleString('vi-VN')} điểm?\n\nSố điểm hiện tại: ${userPoints.toLocaleString('vi-VN')} điểm\nSố điểm sau khi mua: ${(userPoints - requiredPoints).toLocaleString('vi-VN')} điểm`
+          : `Bạn có chắc chắn muốn mua sách "${book.title}"?`}
+        confirmText="Xác nhận mua"
+        cancelText="Hủy"
+        type="info"
+        loading={unlockLoading}
+        onConfirm={executePurchase}
+        onCancel={() => {
+          console.log('Cancel purchase');
+          setShowPurchaseConfirm(false);
+        }}
+      />
     </SafeAreaView>
   );
 };

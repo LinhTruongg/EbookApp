@@ -160,19 +160,50 @@ class AdminController {
     try {
       console.log('📈 Fetching user growth statistics...');
 
-      const { period = '12months' } = req.query; // 6months, 12months, 24months
+      let startDate, endDate;
       
-      let monthsBack = 12;
-      if (period === '6months') monthsBack = 6;
-      if (period === '24months') monthsBack = 24;
+      let period = '12months';
+      
+      if (req.query.startDate && req.query.endDate) {
+        startDate = new Date(req.query.startDate);
+        endDate = new Date(req.query.endDate);
+        
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ngày không hợp lệ'
+          });
+        }
+        
+        if (startDate > endDate) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ngày bắt đầu phải nhỏ hơn ngày kết thúc'
+          });
+        }
+        
+        endDate.setHours(23, 59, 59, 999);
+        startDate.setHours(0, 0, 0, 0);
+        console.log('📈 Using custom date range:', startDate.toISOString(), 'to', endDate.toISOString());
+      } else {
+        period = req.query.period || '12months';
+        let monthsBack = 12;
+        if (period === '6months') monthsBack = 6;
+        if (period === '24months') monthsBack = 24;
 
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - monthsBack);
-      startDate.setDate(1); // Start of month
-      startDate.setHours(0, 0, 0, 0);
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - monthsBack);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        console.log('📈 Using period:', period);
+      }
       
       console.log('📈 Start date:', startDate.toISOString());
-      console.log('📈 Current date:', new Date().toISOString());
+      console.log('📈 End date:', endDate.toISOString());
+      console.log('📈 Date range in days:', Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)));
 
       // Get user growth data by month
       const userGrowthData = await User.findAll({
@@ -182,7 +213,8 @@ class AdminController {
         ],
         where: {
           createdAt: {
-            [Op.gte]: startDate
+            [Op.gte]: startDate,
+            [Op.lte]: endDate
           },
           isActive: true
         },
@@ -212,7 +244,6 @@ class AdminController {
       
       console.log('📈 Total users fetched:', allUsers.length);
 
-      // Get total users before the start date (base total)
       const baseTotalUsers = await User.count({
         where: {
           createdAt: {
@@ -227,21 +258,59 @@ class AdminController {
       // Get total users by month (cumulative from beginning)
       const totalUsersByMonth = [];
       
-      // Generate all months in the range
+      // Create list of months from start of startDate's month to end of endDate's month
+      // Always include the current month even if it's not complete
       const months = [];
-      const currentDate = new Date(startDate);
-      const now = new Date();
-      while (currentDate <= now) {
-        months.push(currentDate.toISOString().substring(0, 7)); // YYYY-MM format
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      const startMonthYear = startDate.getFullYear();
+      const startMonthMonth = startDate.getMonth();
+      const endMonthYear = endDate.getFullYear();
+      const endMonthMonth = endDate.getMonth();
+      const currentDate = new Date(startMonthYear, startMonthMonth, 1);
+      const maxMonths = 120;
+      let monthCount = 0;
+      
+      while (monthCount < maxMonths) {
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+        const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        
+        // Push the current month
+        months.push(monthStr);
+        
+        // Stop if we've reached the end month (inclusive)
+        if (currentYear === endMonthYear && currentMonth === endMonthMonth) {
+          break;
+        }
+        
+        // Stop if we've passed the end month
+        if (currentYear > endMonthYear || (currentYear === endMonthYear && currentMonth > endMonthMonth)) {
+          break;
+        }
+        
+        // Move to next month
+        const nextMonth = new Date(currentDate);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        currentDate.setTime(nextMonth.getTime());
+        monthCount++;
       }
+      
+      if (monthCount >= maxMonths) {
+        console.warn('📈 Warning: Date range too large, limiting to 120 months');
+      }
+
+      console.log('📈 Generated months list:', months);
+      console.log('📈 Months count:', months.length);
+      console.log('📈 First month:', months[0]);
+      console.log('📈 Last month:', months[months.length - 1]);
+      console.log('📈 End month expected:', `${endMonthYear}-${String(endMonthMonth + 1).padStart(2, '0')}`);
+      console.log('📈 User growth data from query:', userGrowthData);
 
       // Calculate cumulative total for each month
       let cumulativeTotal = baseTotalUsers;
       
       for (const month of months) {
         const monthData = userGrowthData.find(data => data.month === month);
-        const newUsers = monthData ? parseInt(monthData.userCount) : 0;
+        const newUsers = monthData ? Number(monthData.userCount) || 0 : 0;
         
         // Add new users to cumulative total
         cumulativeTotal += newUsers;
@@ -252,17 +321,16 @@ class AdminController {
         
         totalUsersByMonth.push({
           month: month,
-          newUsers: newUsers,
-          totalUsers: cumulativeTotal
+          newUsers: Number(newUsers),
+          totalUsers: Number(cumulativeTotal)
         });
       }
       
       console.log('📈 Total users by month:', totalUsersByMonth);
 
-      // Get current month stats
-      const currentMonth = new Date().toISOString().substring(0, 7);
+      const currentMonth = endDate.toISOString().substring(0, 7);
       const currentMonthData = totalUsersByMonth.find(data => data.month === currentMonth);
-      const previousMonth = new Date();
+      const previousMonth = new Date(endDate);
       previousMonth.setMonth(previousMonth.getMonth() - 1);
       const previousMonthStr = previousMonth.toISOString().substring(0, 7);
       const previousMonthData = totalUsersByMonth.find(data => data.month === previousMonthStr);
@@ -278,23 +346,31 @@ class AdminController {
         growthPercentage = 100; // 100% growth if previous month had no new users
       }
 
+      const periodLabel = req.query.startDate && req.query.endDate 
+        ? `${startDate.toISOString().substring(0, 10)} to ${endDate.toISOString().substring(0, 10)}`
+        : (req.query.period || '12months');
+
       const stats = {
-        period: period,
-        totalUsers: totalUsersInSystem,
+        period: periodLabel,
+        totalUsers: Number(totalUsersInSystem),
         growthPercentage: Math.round(growthPercentage * 100) / 100,
-        monthlyData: totalUsersByMonth,
+        monthlyData: totalUsersByMonth.map(item => ({
+          month: item.month,
+          newUsers: Number(item.newUsers),
+          totalUsers: Number(item.totalUsers)
+        })),
         currentMonth: {
-          newUsers: currentMonthNewUsers,
-          totalUsers: currentMonthData?.totalUsers || totalUsersInSystem
+          newUsers: Number(currentMonthNewUsers),
+          totalUsers: Number(currentMonthData?.totalUsers || totalUsersInSystem)
         },
         previousMonth: {
-          newUsers: previousMonthNewUsers,
-          totalUsers: previousMonthData?.totalUsers || (totalUsersInSystem - currentMonthNewUsers)
+          newUsers: Number(previousMonthNewUsers),
+          totalUsers: Number(previousMonthData?.totalUsers || (totalUsersInSystem - currentMonthNewUsers))
         }
       };
       
       console.log('📈 Final stats:', {
-        period,
+        period: periodLabel,
         totalUsers: totalUsersInSystem,
         growthPercentage: stats.growthPercentage,
         currentMonth: stats.currentMonth,
@@ -308,11 +384,12 @@ class AdminController {
       });
 
     } catch (error) {
-      console.error('Error getting user growth stats:', error);
+      console.error('❌ Error getting user growth stats:', error);
+      console.error('❌ Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi lấy thống kê tăng trưởng người dùng',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }
@@ -322,22 +399,68 @@ class AdminController {
     try {
       console.log('💰 Fetching revenue statistics...');
 
-      const { period = '12months' } = req.query; // 6months, 12months, 24months
+      let startDate, endDate;
       
-      let monthsBack = 12;
-      if (period === '6months') monthsBack = 6;
-      if (period === '24months') monthsBack = 24;
-
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - monthsBack);
-      startDate.setDate(1); // Start of month
-      startDate.setHours(0, 0, 0, 0);
+      let period = '12months';
       
-      console.log('💰 Start date:', startDate.toISOString());
-      console.log('💰 Current date:', new Date().toISOString());
+      if (req.query.startDate && req.query.endDate) {
+        startDate = new Date(req.query.startDate);
+        endDate = new Date(req.query.endDate);
+        
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ngày không hợp lệ'
+          });
+        }
+        
+        if (startDate > endDate) {
+          return res.status(400).json({
+            success: false,
+            message: 'Ngày bắt đầu phải nhỏ hơn ngày kết thúc'
+          });
+        }
+        
+        endDate.setHours(23, 59, 59, 999);
+        startDate.setHours(0, 0, 0, 0);
+        console.log('💰 Using custom date range:', startDate.toISOString(), 'to', endDate.toISOString());
+      } else {
+        period = req.query.period || '12months';
+        let monthsBack = 12;
+        if (period === '6months') monthsBack = 6;
+        if (period === '24months') monthsBack = 24;
 
-      // Get purchase transactions (revenue) grouped by month
+        startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - monthsBack);
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+        
+        endDate = new Date();
+        endDate.setHours(23, 59, 59, 999);
+        console.log('💰 Using period:', period);
+      }
+      
+      console.log('💰 Start date:', startDate.toISOString(), 'Local:', startDate.toLocaleString());
+      console.log('💰 End date:', endDate.toISOString(), 'Local:', endDate.toLocaleString());
+      console.log('💰 Date range:', {
+        start: startDate.toISOString(),
+        end: endDate.toISOString(),
+        daysDiff: Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24))
+      });
+
       const { sequelize } = WalletTransaction;
+      
+      const totalPurchaseCount = await WalletTransaction.count({
+        where: {
+          type: 'purchase',
+          createdAt: {
+            [Op.gte]: startDate,
+            [Op.lte]: endDate
+          }
+        }
+      });
+      console.log('💰 Total purchase transactions in date range:', totalPurchaseCount);
+      
       const revenueData = await WalletTransaction.findAll({
         attributes: [
           [sequelize.fn('DATE_FORMAT', sequelize.col('created_at'), '%Y-%m'), 'month'],
@@ -347,7 +470,8 @@ class AdminController {
         where: {
           type: 'purchase',
           createdAt: {
-            [Op.gte]: startDate
+            [Op.gte]: startDate,
+            [Op.lte]: endDate
           }
         },
         group: [sequelize.fn('DATE_FORMAT', sequelize.col('created_at'), '%Y-%m')],
@@ -355,62 +479,179 @@ class AdminController {
         raw: true
       });
       
-      console.log('💰 Revenue data from DB:', revenueData);
+      console.log('💰 Revenue data from DB:', JSON.stringify(revenueData, null, 2));
+      console.log('💰 Revenue data count:', revenueData.length);
       
-      // Also get all purchase transactions for debugging
+      if (revenueData.length === 0) {
+        console.warn('⚠️ No revenue data found in the specified date range');
+      } else {
+        revenueData.forEach(item => {
+          console.log(`💰 Month ${item.month}: revenue=${item.revenue}, purchases=${item.purchases}, revenue type=${typeof item.revenue}`);
+        });
+      }
+      
       const allPurchases = await WalletTransaction.findAll({
         where: {
           type: 'purchase',
           createdAt: {
-            [Op.gte]: startDate
+            [Op.gte]: startDate,
+            [Op.lte]: endDate
           }
+        },
+        order: [['createdAt', 'DESC']],
+        limit: 20,
+        raw: true
+      });
+      console.log('💰 Recent purchases in date range (last 20):', allPurchases.map(p => ({
+        id: p.id,
+        points: p.points,
+        absPoints: Math.abs(p.points),
+        createdAt: p.created_at,
+        description: p.description,
+        month: p.created_at ? new Date(p.created_at).toISOString().substring(0, 7) : null
+      })));
+      
+      const allRecentPurchases = await WalletTransaction.findAll({
+        where: {
+          type: 'purchase'
         },
         order: [['createdAt', 'DESC']],
         limit: 10,
         raw: true
       });
-      console.log('💰 Recent purchases (last 10):', allPurchases.map(p => ({
+      console.log('💰 All recent purchases (last 10, no date filter):', allRecentPurchases.map(p => ({
         id: p.id,
         points: p.points,
+        absPoints: Math.abs(p.points),
         createdAt: p.created_at,
-        description: p.description
+        description: p.description,
+        month: p.created_at ? new Date(p.created_at).toISOString().substring(0, 7) : null,
+        inRange: p.created_at && new Date(p.created_at) >= startDate && new Date(p.created_at) <= endDate
       })));
 
-      // Generate all months in the range
+      // Always include the current month even if it's not complete
       const months = [];
-      const currentDate = new Date(startDate);
-      while (currentDate <= new Date()) {
-        months.push(currentDate.toISOString().substring(0, 7)); // YYYY-MM format
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      const startMonthYear = startDate.getFullYear();
+      const startMonthMonth = startDate.getMonth();
+      const endMonthYear = endDate.getFullYear();
+      const endMonthMonth = endDate.getMonth();
+      const currentDate = new Date(startMonthYear, startMonthMonth, 1);
+      const maxMonths = 120;
+      let monthCount = 0;
+      
+      while (monthCount < maxMonths) {
+        const currentYear = currentDate.getFullYear();
+        const currentMonth = currentDate.getMonth();
+        const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        
+        // Push the current month
+        months.push(monthStr);
+        
+        // Stop if we've reached the end month (inclusive)
+        if (currentYear === endMonthYear && currentMonth === endMonthMonth) {
+          break;
+        }
+        
+        // Stop if we've passed the end month
+        if (currentYear > endMonthYear || (currentYear === endMonthYear && currentMonth > endMonthMonth)) {
+          break;
+        }
+        
+        // Move to next month
+        const nextMonth = new Date(currentDate);
+        nextMonth.setMonth(nextMonth.getMonth() + 1);
+        currentDate.setTime(nextMonth.getTime());
+        monthCount++;
+      }
+      
+      if (monthCount >= maxMonths) {
+        console.warn('💰 Warning: Date range too large, limiting to 120 months');
       }
 
       // Fill in the data for each month
       const monthlyData = months.map(month => {
         const monthData = revenueData.find(data => data.month === month);
-        const revenue = monthData ? parseInt(monthData.revenue) || 0 : 0;
-        const purchases = monthData ? parseInt(monthData.purchases) || 0 : 0;
+        let revenue = 0;
+        let purchases = 0;
+        
+        if (monthData) {
+          // Parse revenue - Sequelize raw queries may return strings or BigInt
+          const rawRevenue = monthData.revenue;
+          if (rawRevenue !== null && rawRevenue !== undefined) {
+            if (typeof rawRevenue === 'bigint') {
+              revenue = Number(rawRevenue);
+            } else if (typeof rawRevenue === 'string') {
+              revenue = parseFloat(rawRevenue);
+            } else if (typeof rawRevenue === 'number') {
+              revenue = rawRevenue;
+            } else {
+              revenue = Number(rawRevenue);
+            }
+            
+            if (isNaN(revenue) || revenue < 0) {
+              console.warn(`⚠️ Invalid revenue value for month ${month}:`, rawRevenue, 'type:', typeof rawRevenue);
+              revenue = 0;
+            }
+          }
+          
+          // Parse purchases
+          const rawPurchases = monthData.purchases;
+          if (rawPurchases !== null && rawPurchases !== undefined) {
+            if (typeof rawPurchases === 'bigint') {
+              purchases = Number(rawPurchases);
+            } else if (typeof rawPurchases === 'string') {
+              purchases = parseInt(rawPurchases, 10);
+            } else if (typeof rawPurchases === 'number') {
+              purchases = rawPurchases;
+            } else {
+              purchases = Number(rawPurchases);
+            }
+            
+            if (isNaN(purchases) || purchases < 0) {
+              console.warn(`⚠️ Invalid purchases value for month ${month}:`, rawPurchases, 'type:', typeof rawPurchases);
+              purchases = 0;
+            }
+          }
+        }
         
         if (month === new Date().toISOString().substring(0, 7)) {
-          console.log(`💰 Current month ${month}: revenue=${revenue}, purchases=${purchases}`);
+          console.log(`💰 Current month ${month}: revenue=${revenue} (type: ${typeof revenue}), purchases=${purchases} (type: ${typeof purchases})`);
         }
         
         return {
           month: month,
-          revenue: revenue,
-          purchases: purchases
+          revenue: Number(revenue),
+          purchases: Number(purchases)
         };
       });
       
-      console.log('💰 Monthly data:', monthlyData);
+      console.log('💰 Generated months list:', months);
+      console.log('💰 Months count:', months.length);
+      console.log('💰 First month:', months[0]);
+      console.log('💰 Last month:', months[months.length - 1]);
+      console.log('💰 End month expected:', `${endMonthYear}-${String(endMonthMonth + 1).padStart(2, '0')}`);
+      console.log('💰 Monthly data:', JSON.stringify(monthlyData, null, 2));
+      console.log('💰 Monthly data summary:', {
+        totalMonths: monthlyData.length,
+        monthsWithRevenue: monthlyData.filter(m => m.revenue > 0).length,
+        monthsWithPurchases: monthlyData.filter(m => m.purchases > 0).length,
+        revenueByMonth: monthlyData.filter(m => m.revenue > 0).map(m => ({
+          month: m.month,
+          revenue: m.revenue,
+          purchases: m.purchases
+        }))
+      });
 
       // Calculate total revenue and purchases
       const totalRevenue = monthlyData.reduce((sum, item) => sum + item.revenue, 0);
       const totalPurchases = monthlyData.reduce((sum, item) => sum + item.purchases, 0);
+      
+      console.log('💰 Total revenue calculated:', totalRevenue);
+      console.log('💰 Total purchases calculated:', totalPurchases);
 
-      // Get current month stats
-      const currentMonth = new Date().toISOString().substring(0, 7);
+      const currentMonth = endDate.toISOString().substring(0, 7);
       const currentMonthData = monthlyData.find(data => data.month === currentMonth);
-      const previousMonth = new Date();
+      const previousMonth = new Date(endDate);
       previousMonth.setMonth(previousMonth.getMonth() - 1);
       const previousMonthStr = previousMonth.toISOString().substring(0, 7);
       const previousMonthData = monthlyData.find(data => data.month === previousMonthStr);
@@ -423,19 +664,27 @@ class AdminController {
         growthPercentage = 100; // 100% growth if previous month had no revenue
       }
 
+      const periodLabel = req.query.startDate && req.query.endDate 
+        ? `${startDate.toISOString().substring(0, 10)} to ${endDate.toISOString().substring(0, 10)}`
+        : (req.query.period || '12months');
+
       const stats = {
-        period: period,
-        totalRevenue: totalRevenue,
-        totalPurchases: totalPurchases,
+        period: periodLabel,
+        totalRevenue: Number(totalRevenue),
+        totalPurchases: Number(totalPurchases),
         growthPercentage: Math.round(growthPercentage * 100) / 100,
-        monthlyData: monthlyData,
+        monthlyData: monthlyData.map(item => ({
+          month: item.month,
+          revenue: Number(item.revenue),
+          purchases: Number(item.purchases)
+        })),
         currentMonth: {
-          revenue: currentMonthData?.revenue || 0,
-          purchases: currentMonthData?.purchases || 0
+          revenue: Number(currentMonthData?.revenue || 0),
+          purchases: Number(currentMonthData?.purchases || 0)
         },
         previousMonth: {
-          revenue: previousMonthData?.revenue || 0,
-          purchases: previousMonthData?.purchases || 0
+          revenue: Number(previousMonthData?.revenue || 0),
+          purchases: Number(previousMonthData?.purchases || 0)
         }
       };
 
@@ -446,11 +695,12 @@ class AdminController {
       });
 
     } catch (error) {
-      console.error('Error getting revenue stats:', error);
+      console.error('❌ Error getting revenue stats:', error);
+      console.error('❌ Error stack:', error.stack);
       res.status(500).json({
         success: false,
         message: 'Lỗi server khi lấy thống kê doanh thu',
-        error: error.message
+        error: process.env.NODE_ENV === 'development' ? error.message : undefined
       });
     }
   }

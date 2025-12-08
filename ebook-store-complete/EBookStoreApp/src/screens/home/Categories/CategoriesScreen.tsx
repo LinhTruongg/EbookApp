@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   FlatList,
   StatusBar,
-  TextInput,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -23,8 +22,6 @@ interface CategoryWithUI extends Category {
 
 const CategoriesScreen: React.FC = () => {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isSearchVisible, setIsSearchVisible] = useState(false);
   const [categories, setCategories] = useState<CategoryWithUI[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -81,21 +78,6 @@ const CategoriesScreen: React.FC = () => {
     loadCategories();
   };
 
-  const filteredCategories = categories.filter(category =>
-    category.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-  };
-
-  const toggleSearch = () => {
-    setIsSearchVisible(!isSearchVisible);
-    if (isSearchVisible) {
-      setSearchQuery('');
-    }
-  };
-
   const renderCategoryItem = ({ item }: { item: CategoryWithUI }) => (
     <TouchableOpacity
       style={[styles.categoryCard, { backgroundColor: item.backgroundColor }]}
@@ -112,27 +94,7 @@ const CategoriesScreen: React.FC = () => {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Thể loại</Text>
-        <TouchableOpacity style={styles.searchIcon} onPress={toggleSearch}>
-          <Text style={styles.searchIconText}>🔍</Text>
-        </TouchableOpacity>
       </View>
-
-      {/* Search Bar */}
-      {isSearchVisible && (
-        <View style={styles.searchBar}>
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Tìm kiếm thể loại..."
-            value={searchQuery}
-            onChangeText={handleSearch}
-            placeholderTextColor={COLORS.textSecondary}
-            autoFocus
-          />
-          <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButton}>
-            <Text style={styles.clearButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Categories Grid */}
       <View style={styles.categoriesContainer}>
@@ -143,7 +105,7 @@ const CategoriesScreen: React.FC = () => {
           </View>
         ) : (
           <FlatList
-            data={filteredCategories}
+            data={categories}
             renderItem={renderCategoryItem}
             keyExtractor={(item) => item.id.toString()}
             numColumns={3}
@@ -159,9 +121,7 @@ const CategoriesScreen: React.FC = () => {
             }
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  {searchQuery.trim() ? 'Không tìm thấy thể loại nào' : 'Không có thể loại nào'}
-                </Text>
+                <Text style={styles.emptyText}>Không có thể loại nào</Text>
               </View>
             }
           />
@@ -178,7 +138,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 50,
     paddingBottom: SIZES.spacing.lg,
@@ -197,20 +157,7 @@ const styles = StyleSheet.create({
     fontSize: SIZES.font.xxl,
     fontWeight: '700',
     color: COLORS.text,
-    flex: 1,
     textAlign: 'center',
-  },
-  searchIcon: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.gray100,
-    borderRadius: SIZES.borderRadius.lg,
-  },
-  searchIconText: {
-    fontSize: SIZES.icon.sm,
-    color: COLORS.text,
   },
   categoriesContainer: {
     flex: 1,
@@ -246,32 +193,6 @@ const styles = StyleSheet.create({
     color: COLORS.textInverse,
     textAlign: 'center',
     lineHeight: 16,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SIZES.spacing.lg,
-    paddingVertical: SIZES.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: COLORS.gray50,
-    borderRadius: SIZES.borderRadius.md,
-    paddingHorizontal: SIZES.spacing.md,
-    paddingVertical: SIZES.spacing.sm,
-    fontSize: SIZES.font.md,
-    color: COLORS.text,
-  },
-  clearButton: {
-    marginLeft: SIZES.spacing.sm,
-    padding: SIZES.spacing.sm,
-  },
-  clearButtonText: {
-    fontSize: SIZES.font.md,
-    color: COLORS.textSecondary,
   },
   emptyContainer: {
     flex: 1,

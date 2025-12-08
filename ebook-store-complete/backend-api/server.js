@@ -39,6 +39,7 @@ const adminRoutes = require('./routes/admin');
 const uploadRoutes = require('./routes/upload');
 const paymentRoutes = require('./routes/payments');
 const walletRoutes = require('./routes/wallet');
+const chatbotRoutes = require('./routes/chatbot');
 
 // Import middleware
 const errorHandler = require('./middleware/errorHandler');
@@ -185,6 +186,7 @@ app.use('/api/admin', authenticateToken, adminRoutes);
 app.use('/api/upload', authenticateToken, uploadRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/wallet', walletRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // API Documentation
 const swaggerJsdoc = require('swagger-jsdoc');

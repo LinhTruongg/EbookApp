@@ -67,6 +67,7 @@ interface ExportExcelProps {
   fileName?: string;
   exportType?: ExportType;
   buttonText?: string;
+  isPrimary?: boolean;
 }
 
 const ExportExcel: React.FC<ExportExcelProps> = ({
@@ -75,7 +76,8 @@ const ExportExcel: React.FC<ExportExcelProps> = ({
   dashboardStats,
   fileName = 'Dashboard_Report',
   exportType = 'all',
-  buttonText
+  buttonText,
+  isPrimary = false
 }) => {
   const formatMonthLabel = (month: string) => {
     const [year, monthNum] = month.split('-');
@@ -241,14 +243,19 @@ const ExportExcel: React.FC<ExportExcelProps> = ({
 
   const getButtonText = () => {
     if (buttonText) return buttonText;
-    if (exportType === 'revenue') return '📊 Xuất Doanh Thu';
-    if (exportType === 'userGrowth') return '📈 Xuất Tăng Trưởng';
-    return '📊 Xuất Tất Cả';
+    if (exportType === 'revenue') return 'Xuất Doanh Thu';
+    if (exportType === 'userGrowth') return 'Xuất Tăng Trưởng';
+    return 'Xuất Tất Cả';
   };
 
   return (
-    <TouchableOpacity style={styles.exportButton} onPress={exportToExcel}>
-      <Text style={styles.exportButtonText}>{getButtonText()}</Text>
+    <TouchableOpacity 
+      style={[styles.exportButton, isPrimary && styles.primaryButton]} 
+      onPress={exportToExcel}
+    >
+      <Text style={[styles.exportButtonText, isPrimary && styles.primaryButtonText]}>
+        {getButtonText()}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -271,11 +278,25 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 3,
   },
+  primaryButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+    minWidth: '100%',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 5,
+  },
   exportButtonText: {
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  primaryButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });
 

@@ -258,13 +258,7 @@ const LibraryScreen: React.FC = () => {
         
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Text style={styles.headerIconText}>✏️</Text>
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Thư viện</Text>
-          <TouchableOpacity style={styles.headerIcon}>
-            <Text style={styles.headerIconText}>🔍</Text>
-          </TouchableOpacity>
         </View>
 
         <View style={styles.loadingContainer}>
@@ -281,13 +275,7 @@ const LibraryScreen: React.FC = () => {
       
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerIcon}>
-          <Text style={styles.headerIconText}>✏️</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Thư viện</Text>
-        <TouchableOpacity style={styles.headerIcon} onPress={openSearchModal}>
-          <Text style={styles.headerIconText}>🔍</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -414,7 +402,7 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 50,
     paddingBottom: 20,

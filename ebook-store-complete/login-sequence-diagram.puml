@@ -1,0 +1,39 @@
+@startuml Login Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Chức năng Đăng nhập
+
+actor "Người dùng" as User
+participant "Login Screen\n(LoginForm)" as LoginScreen
+participant "Backend API\n(AuthController)" as Backend
+participant "Database\n(MySQL)" as Database
+
+User -> LoginScreen: Nhập email và mật khẩu
+User -> LoginScreen: Nhấn nút "Đăng nhập"
+
+LoginScreen -> LoginScreen: Kiểm tra validation\n(email, password)
+
+LoginScreen -> Backend: Gửi thông tin đăng nhập\nPOST /api/auth/login\n{email, password}
+
+Backend -> Database: Kiểm tra thông tin tài khoản\nTìm user theo email
+
+Database -> Backend: Trả về thông tin user
+
+Backend -> Backend: Xác thực mật khẩu\n(bcrypt.compare)
+Backend -> Backend: Kiểm tra trạng thái tài khoản\n(user.isActive)
+
+alt [Đúng]
+    Backend -> Backend: Cập nhật lastLogin
+    Backend -> Backend: Tạo JWT token và refresh token
+    Backend -> LoginScreen: Trả về thành công\n{success: true, data: {user, token, refreshToken}}
+    LoginScreen -> LoginScreen: Lưu token và user vào AsyncStorage
+    LoginScreen -> User: Đăng nhập thành công\nĐiều hướng theo role
+else [Sai]
+    Backend -> LoginScreen: Trả về lỗi\n{success: false, message: "Email hoặc mật khẩu không đúng"}
+    LoginScreen -> User: Hiển thị thông báo lỗi
+end
+
+@enduml
+

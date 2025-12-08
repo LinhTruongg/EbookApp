@@ -57,6 +57,9 @@ export const API_ENDPOINTS = {
     REFUND: '/payments/refund',
     HISTORY: '/payments/history',
   },
+  CHATBOT: {
+    CHAT: '/chatbot/chat',
+  },
 };
 
 export const getApiUrl = (endpoint: string): string => {

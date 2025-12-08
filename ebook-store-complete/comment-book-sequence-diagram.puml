@@ -1,0 +1,84 @@
+@startuml Comment Book Sequence Diagram
+!theme plain
+skinparam backgroundColor #FFFFFF
+skinparam sequenceMessageAlign center
+
+title Sequence Diagram - Chức năng Bình Luận Sách
+
+actor "Người dùng" as User
+participant "Book Detail Screen" as DetailScreen
+participant "Backend API\n(CommentController)" as Backend
+participant "Content Filter" as Filter
+participant "Database\n(MySQL)" as Database
+
+== Xem bình luận ==
+
+User -> DetailScreen: Mở màn hình chi tiết sách
+
+DetailScreen -> Backend: Lấy danh sách bình luận\nGET /api/comments/book/{bookId}\n?page=1&limit=20
+
+Backend -> Database: Tìm comments\nWHERE bookId = ? AND isApproved = true
+Database -> Backend: Trả về comments với user info
+
+Backend -> Database: Lấy replies cho mỗi comment\n(limit 5 replies mỗi comment)
+Database -> Backend: Trả về replies
+
+Backend -> Database: Lấy user likes\n(để hiển thị đã like chưa)
+Database -> Backend: Trả về user likes
+
+Backend -> DetailScreen: Trả về comments\n{comments, pagination, userLikes}
+DetailScreen -> User: Hiển thị danh sách bình luận
+
+== Đăng bình luận ==
+
+User -> DetailScreen: Nhập nội dung bình luận
+User -> DetailScreen: Nhấn nút "Đăng"
+
+DetailScreen -> DetailScreen: Kiểm tra validation\n(content không rỗng, <= 2000 ký tự)
+
+DetailScreen -> Backend: Tạo bình luận\nPOST /api/comments/book/{bookId}\n{content, parentId?}
+
+Backend -> Database: Kiểm tra sách tồn tại
+Database -> Backend: Trả về book
+
+alt [Có parentId - trả lời comment]
+    Backend -> Database: Kiểm tra parent comment tồn tại
+    Database -> Backend: Trả về parent comment
+end
+
+Backend -> Filter: Kiểm tra nội dung nhạy cảm\ncontainsSensitiveWords(content)
+Filter -> Backend: Trả về kết quả
+
+alt [Có từ nhạy cảm]
+    Backend -> Database: Tạo comment với isApproved = false
+    Backend -> DetailScreen: Trả về thành công\n{comment, isPending: true, message: "Chờ duyệt"}
+    DetailScreen -> User: Hiển thị "Bình luận đang chờ duyệt"
+else [Không có từ nhạy cảm]
+    Backend -> Database: Tạo comment với isApproved = true
+    Database -> Backend: Trả về comment với user info
+    Backend -> DetailScreen: Trả về thành công\n{comment, isPending: false}
+    DetailScreen -> DetailScreen: Thêm comment vào đầu danh sách
+    DetailScreen -> User: Hiển thị bình luận mới
+end
+
+== Like bình luận ==
+
+User -> DetailScreen: Nhấn nút "Like" trên comment
+
+DetailScreen -> Backend: Like/Unlike comment\nPOST /api/comments/{commentId}/like
+
+Backend -> Database: Tìm CommentLike\n(userId, commentId)
+Database -> Backend: Trả về like (nếu có)
+
+alt [Đã like - Unlike]
+    Backend -> Database: Xóa CommentLike\nGiảm likesCount
+else [Chưa like - Like]
+    Backend -> Database: Tạo CommentLike\nTăng likesCount
+end
+
+Database -> Backend: Cập nhật thành công
+Backend -> DetailScreen: Trả về {hasLiked, likesCount}
+DetailScreen -> User: Cập nhật hiển thị like
+
+@enduml
+

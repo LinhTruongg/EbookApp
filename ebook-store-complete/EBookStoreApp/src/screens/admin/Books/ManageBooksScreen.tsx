@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,12 +16,14 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { apiService } from '../../../services/api';
 import { Book, Category, Author } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import DateTimeField from '../../../components/common/DateTimeField';
 
 interface ManageBooksScreenProps {
   route?: {
@@ -82,6 +84,9 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categoryDropdownOpen, setCategoryDropdownOpen] = useState(false);
   const [authorsDropdownOpen, setAuthorsDropdownOpen] = useState(false);
+  const [extractingPageCount, setExtractingPageCount] = useState(false);
+  const pdfWebViewRef = useRef<WebView>(null);
+  const [pdfHtml, setPdfHtml] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -180,6 +185,103 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
     setSearchQuery(text);
   };
 
+  const extractPageCountFromPDF = async (fileUri: string, mimeType: string) => {
+    if (mimeType !== 'application/pdf') {
+      return;
+    }
+
+    try {
+      setExtractingPageCount(true);
+      console.log('📄 Extracting page count from PDF...');
+
+      let fileBase64: string;
+      if (fileUri.startsWith('blob:')) {
+        const response = await fetch(fileUri);
+        const blobData = await response.blob();
+        const reader = new FileReader();
+        fileBase64 = await new Promise((resolve, reject) => {
+          reader.onload = () => {
+            const base64 = (reader.result as string).split(',')[1];
+            resolve(base64);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blobData);
+        });
+      } else {
+        fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
+          encoding: 'base64',
+        });
+      }
+
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body>
+    <script>
+        const pdfBase64 = '${fileBase64}';
+        
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        
+        const binaryString = atob(pdfBase64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        pdfjsLib.getDocument({ data: bytes }).promise
+            .then(pdf => {
+                const pageCount = pdf.numPages;
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'pageCount',
+                        pageCount: pageCount
+                    }));
+                }
+            })
+            .catch(error => {
+                if (window.ReactNativeWebView) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                        type: 'error',
+                        error: error.message
+                    }));
+                }
+            });
+    </script>
+</body>
+</html>`;
+
+      setPdfHtml(html);
+    } catch (error) {
+      console.error('❌ Error extracting page count:', error);
+      setExtractingPageCount(false);
+    }
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'pageCount') {
+        console.log('✅ Page count extracted:', data.pageCount);
+        setFormData({ ...formData, pageCount: String(data.pageCount) });
+        setExtractingPageCount(false);
+        setPdfHtml(null);
+        Alert.alert('✅ Thành công', `Đã tự động lấy số trang: ${data.pageCount} trang`);
+      } else if (data.type === 'error') {
+        console.error('❌ Error extracting page count:', data.error);
+        setExtractingPageCount(false);
+        setPdfHtml(null);
+      }
+    } catch (error) {
+      console.error('❌ Error parsing WebView message:', error);
+      setExtractingPageCount(false);
+      setPdfHtml(null);
+    }
+  };
+
   const pickBookFile = async () => {
     try {
       console.log('📂 Opening file picker...');
@@ -196,12 +298,18 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         const asset = result.assets[0];
         console.log('✅ File selected:', asset);
 
-        setSelectedFile({
+        const fileInfo = {
           name: asset.name,
           uri: asset.uri,
           size: asset.size || 0,
           type: asset.mimeType || 'application/octet-stream',
-        });
+        };
+
+        setSelectedFile(fileInfo);
+
+        if (asset.mimeType === 'application/pdf') {
+          await extractPageCountFromPDF(asset.uri, asset.mimeType);
+        }
 
         Alert.alert('✅ Thành công', `Đã chọn file: ${asset.name}`);
       } else if (result.canceled) {
@@ -1015,23 +1123,45 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
               </View>
               <View style={[styles.formGroup, styles.halfWidth]}>
                 <Text style={styles.label}>Số trang</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.pageCount}
-                  onChangeText={(text) => setFormData({ ...formData, pageCount: text })}
-                  placeholder="Nhập số trang"
-                  keyboardType="numeric"
-                />
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    style={[styles.input, styles.inputReadOnly, extractingPageCount && styles.inputDisabled]}
+                    value={formData.pageCount}
+                    placeholder={extractingPageCount ? "Đang đọc số trang..." : "Số trang sẽ được tự động lấy từ file PDF"}
+                    keyboardType="numeric"
+                    editable={false}
+                  />
+                  {extractingPageCount && (
+                    <View style={styles.loadingOverlay}>
+                      <ActivityIndicator size="small" color="#3B82F6" />
+                    </View>
+                  )}
+                </View>
+                {selectedFile?.type === 'application/pdf' && !extractingPageCount && !formData.pageCount && (
+                  <Text style={styles.helperText}>
+                    Số trang sẽ được tự động lấy từ file PDF
+                  </Text>
+                )}
               </View>
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Ngày xuất bản</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.publicationDate}
-                onChangeText={(text) => setFormData({ ...formData, publicationDate: text })}
-                placeholder="YYYY-MM-DD"
+              <DateTimeField
+                label="Ngày xuất bản"
+                value={formData.publicationDate ? new Date(formData.publicationDate + 'T00:00:00').toISOString() : undefined}
+                onChange={(isoString) => {
+                  console.log('📅 Publication date onChange called with ISO:', isoString);
+                  const date = new Date(isoString);
+                  const year = date.getFullYear();
+                  const month = String(date.getMonth() + 1).padStart(2, '0');
+                  const day = String(date.getDate()).padStart(2, '0');
+                  const formatted = `${year}-${month}-${day}`;
+                  console.log('📅 Formatted date (local):', formatted, 'from date:', date.toLocaleDateString('vi-VN'));
+                  setFormData({ ...formData, publicationDate: formatted });
+                  console.log('📅 Updated formData.publicationDate:', formatted);
+                }}
+                mode="date"
+                placeholder="Chọn ngày xuất bản"
               />
             </View>
 
@@ -1157,6 +1287,16 @@ const ManageBooksScreen: React.FC<ManageBooksScreenProps> = ({ route, navigation
         onConfirm={confirmDelete}
         onCancel={cancelDelete}
       />
+
+      {/* Hidden WebView for PDF page count extraction */}
+      {pdfHtml && (
+        <WebView
+          ref={pdfWebViewRef}
+          source={{ html: pdfHtml }}
+          onMessage={handleWebViewMessage}
+          style={{ width: 1, height: 1, opacity: 0, position: 'absolute' }}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -1531,6 +1671,25 @@ const styles = StyleSheet.create({
   },
   disabledSubmitButton: {
     opacity: 0.6,
+  },
+  inputDisabled: {
+    backgroundColor: '#F3F4F6',
+    opacity: 0.7,
+  },
+  inputReadOnly: {
+    backgroundColor: '#F9FAFB',
+    color: '#6B7280',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
 });
 

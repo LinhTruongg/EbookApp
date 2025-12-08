@@ -465,7 +465,6 @@ class ApiService {
       avatar: data.avatar,
       birthDate: data.birthDate,
       nationality: data.nationality,
-      website: data.website,
       socialLinks: (data as any).socialLinks || data.socialMedia,
       isActive: data.isActive,
     };
@@ -481,7 +480,6 @@ class ApiService {
       avatar: data.avatar,
       birthDate: data.birthDate,
       nationality: data.nationality,
-      website: data.website,
       socialLinks: (data as any).socialLinks || data.socialMedia,
       isActive: data.isActive,
     };
@@ -499,6 +497,16 @@ class ApiService {
     console.log('🔍 Searching books with query:', query);
     const response = await this.axiosInstance.get(`/books/search?q=${encodeURIComponent(query)}`);
     console.log('✅ Books search completed');
+    return response.data;
+  }
+
+  async chatWithAI(message: string, conversationHistory: any[] = []): Promise<ApiResponse<{ message: string; suggestedBooks: Book[]; searchKeywords: string[] }>> {
+    console.log('🤖 Chatting with AI:', message);
+    const response = await this.axiosInstance.post('/chatbot/chat', {
+      message,
+      conversationHistory
+    });
+    console.log('✅ AI chat completed');
     return response.data;
   }
 
@@ -982,6 +990,30 @@ class ApiService {
     return response.data;
   }
 
+  async getUserGrowthStatsByDateRange(startDate: string, endDate: string): Promise<ApiResponse<{
+    period: string;
+    totalUsers: number;
+    growthPercentage: number;
+    monthlyData: Array<{
+      month: string;
+      newUsers: number;
+      totalUsers: number;
+    }>;
+    currentMonth: {
+      newUsers: number;
+      totalUsers: number;
+    };
+    previousMonth: {
+      newUsers: number;
+      totalUsers: number;
+    };
+  }>> {
+    console.log('📈 Fetching user growth statistics by date range...');
+    const response = await this.axiosInstance.get(`/admin/dashboard/user-growth?startDate=${startDate}&endDate=${endDate}`);
+    console.log('✅ User growth statistics fetched successfully');
+    return response.data;
+  }
+
   async getRecentActivities(limit: number = 20): Promise<ApiResponse<Array<{
     id: number;
     action: 'create' | 'update' | 'delete';
@@ -1027,6 +1059,31 @@ class ApiService {
   }>> {
     console.log('💰 Fetching revenue statistics...');
     const response = await this.axiosInstance.get(`/admin/dashboard/revenue?period=${period}`);
+    console.log('✅ Revenue statistics fetched successfully');
+    return response.data;
+  }
+
+  async getRevenueStatsByDateRange(startDate: string, endDate: string): Promise<ApiResponse<{
+    period: string;
+    totalRevenue: number;
+    totalPurchases: number;
+    growthPercentage: number;
+    monthlyData: Array<{
+      month: string;
+      revenue: number;
+      purchases: number;
+    }>;
+    currentMonth: {
+      revenue: number;
+      purchases: number;
+    };
+    previousMonth: {
+      revenue: number;
+      purchases: number;
+    };
+  }>> {
+    console.log('💰 Fetching revenue statistics by date range...');
+    const response = await this.axiosInstance.get(`/admin/dashboard/revenue?startDate=${startDate}&endDate=${endDate}`);
     console.log('✅ Revenue statistics fetched successfully');
     return response.data;
   }

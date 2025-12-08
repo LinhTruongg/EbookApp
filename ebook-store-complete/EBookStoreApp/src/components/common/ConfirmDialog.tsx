@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -17,6 +18,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   type?: 'danger' | 'warning' | 'info';
+  loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -30,6 +32,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   confirmText = 'Xác nhận',
   cancelText = 'Hủy',
   type = 'danger',
+  loading = false,
   onConfirm,
   onCancel,
 }) => {
@@ -97,6 +100,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={[styles.button, styles.cancelButton]}
                 onPress={onCancel}
                 activeOpacity={0.7}
+                disabled={loading}
                 accessibilityRole="button"
                 accessibilityLabel={`Hủy ${title}`}
               >
@@ -107,14 +111,20 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 style={[
                   styles.button,
                   styles.confirmButton,
-                  { backgroundColor: color }
+                  { backgroundColor: color },
+                  loading && styles.buttonDisabled
                 ]}
                 onPress={onConfirm}
                 activeOpacity={0.7}
+                disabled={loading}
                 accessibilityRole="button"
                 accessibilityLabel={`Xác nhận ${title}`}
               >
-                <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                {loading ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -205,6 +215,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });
 

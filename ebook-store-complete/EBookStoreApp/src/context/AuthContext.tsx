@@ -262,7 +262,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         throw new Error(errorMsg);
       }
     } catch (error: any) {
-      console.error('❌ AuthContext.login error:', error);
+      const isAuthError = error?.response?.status === 401 || error?.response?.status === 403 || error?.status === 401 || error?.status === 403;
+      
+      if (!isAuthError && __DEV__) {
+        console.error('❌ AuthContext.login error:', error);
+      }
+      
       dispatch({ type: 'AUTH_LOADING', payload: false });
       
       // Safely extract error message
